@@ -76,6 +76,12 @@ pub enum InternalCommand {
     History,
     /// Clear AI conversation
     Clear,
+    /// Show system info
+    SysInfo,
+    /// Show running services
+    Services,
+    /// Show installed packages
+    Packages,
 }
 
 /// Route user input to appropriate handler
@@ -147,28 +153,19 @@ pub fn route_input(input: &str) -> InputRoute {
         });
     }
 
-    // Check for AI sysinfo command
+    // Check for AI sysinfo command - internal command (no AI needed)
     if AI_SYSINFO.is_match(trimmed) {
-        return InputRoute::Ai(AiCommand {
-            mode: QueryMode::SysInfo,
-            query: "system information".to_string(),
-        });
+        return InputRoute::Internal(InternalCommand::SysInfo);
     }
 
-    // Check for AI services command
+    // Check for AI services command - internal command (no AI needed)
     if AI_SERVICES.is_match(trimmed) {
-        return InputRoute::Ai(AiCommand {
-            mode: QueryMode::SysInfo,
-            query: "list running services".to_string(),
-        });
+        return InputRoute::Internal(InternalCommand::Services);
     }
 
-    // Check for AI packages command
+    // Check for AI packages command - internal command (no AI needed)
     if AI_PACKAGES.is_match(trimmed) {
-        return InputRoute::Ai(AiCommand {
-            mode: QueryMode::SysInfo,
-            query: "list installed packages".to_string(),
-        });
+        return InputRoute::Internal(InternalCommand::Packages);
     }
 
     // Check for generic AI prefix
@@ -319,10 +316,24 @@ mod tests {
     #[test]
     fn test_route_ai_sysinfo() {
         match route_input("ai sysinfo") {
-            InputRoute::Ai(cmd) => {
-                assert!(matches!(cmd.mode, QueryMode::SysInfo));
-            }
-            _ => panic!("Expected Ai route"),
+            InputRoute::Internal(InternalCommand::SysInfo) => {}
+            _ => panic!("Expected Internal SysInfo route"),
+        }
+    }
+
+    #[test]
+    fn test_route_ai_services() {
+        match route_input("ai services") {
+            InputRoute::Internal(InternalCommand::Services) => {}
+            _ => panic!("Expected Internal Services route"),
+        }
+    }
+
+    #[test]
+    fn test_route_ai_packages() {
+        match route_input("ai packages") {
+            InputRoute::Internal(InternalCommand::Packages) => {}
+            _ => panic!("Expected Internal Packages route"),
         }
     }
 

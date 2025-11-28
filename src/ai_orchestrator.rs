@@ -314,11 +314,47 @@ Always respond with valid JSON matching this schema:
             base
         ),
         QueryMode::Fix => format!(
-            "{}\n\nFor this FIX request, analyze the error and propose commands to fix it. Explain what went wrong in the summary.",
+            r#"{}
+
+For this FIX request:
+1. Analyze the failed command and error output provided in the context
+2. Diagnose the root cause in your summary
+3. Propose specific commands to fix the issue
+4. Use kind="command_sequence" with fix steps
+5. Common fixes include:
+   - Missing dependencies: install them
+   - Permission errors: suggest chmod/chown or explain why sudo is needed
+   - File not found: check paths, create directories
+   - Syntax errors: show the corrected command
+   - Service errors: check status, restart, view logs
+
+If you cannot determine the fix, use kind="answer_only" and explain what additional information is needed."#,
             base
         ),
         QueryMode::Do => format!(
-            "{}\n\nFor this DO request, create a comprehensive multi-step plan. Use kind=\"plan_and_commands\" with detailed steps.",
+            r#"{}
+
+For this DO request, create a comprehensive multi-step plan:
+1. Use kind="plan_and_commands"
+2. Start with a clear summary explaining the overall approach
+3. Break the task into logical, atomic steps
+4. Each step should be independently verifiable
+5. Order steps by dependency (prerequisites first)
+6. Mark any destructive or sudo operations appropriately
+7. Include verification steps where appropriate (e.g., check if service started)
+8. If the task could fail, include rollback considerations in the summary
+
+Example for "deploy a Node.js app":
+{{
+  "kind": "plan_and_commands",
+  "summary": "Deploy Node.js application: install dependencies, build, and start with PM2",
+  "steps": [
+    {{"id": "1", "description": "Install npm dependencies", "shell_command": "npm install", "is_destructive": false}},
+    {{"id": "2", "description": "Build the application", "shell_command": "npm run build", "is_destructive": false}},
+    {{"id": "3", "description": "Start with PM2", "shell_command": "pm2 start ecosystem.config.js", "is_destructive": false}},
+    {{"id": "4", "description": "Verify deployment", "shell_command": "pm2 status", "is_destructive": false}}
+  ]
+}}"#,
             base
         ),
         QueryMode::SysInfo => format!(

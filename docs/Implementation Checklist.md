@@ -283,56 +283,56 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
 
 ### 3.1 Multi-Step `ai do` (`src/ai_orchestrator.rs`, `src/execution_engine.rs`)
 
-- [ ] Parse `ai do "complex task"`
-- [ ] Build multi-step prompt:
-  - [ ] Request `PlanAndCommands` response
-  - [ ] Include detailed instructions
-- [ ] Implement plan confirmation:
-  - [ ] Show full plan overview
-  - [ ] Allow plan-level accept/reject
-- [ ] Implement sequential execution:
-  - [ ] Execute steps in order
-  - [ ] Show progress indicator
-  - [ ] Handle failures gracefully
-- [ ] Implement error recovery:
-  - [ ] On step failure, offer options
-  - [ ] Retry / Skip / Ask AI to fix / Abort
+- [x] Parse `ai do "complex task"`
+- [x] Build multi-step prompt:
+  - [x] Request `PlanAndCommands` response
+  - [x] Include detailed instructions
+- [x] Implement plan confirmation:
+  - [x] Show full plan overview
+  - [x] Allow plan-level accept/reject
+- [x] Implement sequential execution:
+  - [x] Execute steps in order
+  - [x] Show progress indicator
+  - [x] Handle failures gracefully
+- [x] Implement error recovery:
+  - [x] On step failure, offer options
+  - [x] Retry / Skip / Ask AI to fix / Abort
 - [ ] Capture output for AI context (optional)
 - [ ] Write integration tests
 
 ### 3.2 `ai fix` Command
 
-- [ ] Track last command executed
-- [ ] Track last stderr output
-- [ ] Parse `ai fix`
-- [ ] Build fix-focused prompt:
-  - [ ] Include failed command
-  - [ ] Include error output
-  - [ ] Request diagnosis and fix
-- [ ] Pass response to execution engine
+- [x] Track last command executed
+- [x] Track last stderr output
+- [x] Parse `ai fix`
+- [x] Build fix-focused prompt:
+  - [x] Include failed command
+  - [x] Include error output
+  - [x] Request diagnosis and fix
+- [x] Pass response to execution engine
 - [ ] Test with various error scenarios
 
 ### 3.3 Context Collector (`src/context.rs`)
 
-- [ ] Implement system info collection:
-  - [ ] OS and version (`uname -a`)
-  - [ ] Distribution (parse `/etc/os-release`)
-  - [ ] CPU info
-  - [ ] Memory info
-  - [ ] Disk usage
-- [ ] Implement `ai sysinfo` command
-- [ ] Implement service listing:
-  - [ ] Detect init system (systemd, init, launchd)
-  - [ ] List running services
-- [ ] Implement `ai services` command
-- [ ] Implement package listing:
-  - [ ] Detect package manager
-  - [ ] List key packages
-- [ ] Implement `ai packages` command
-- [ ] Implement file reader:
-  - [ ] Size-limited reading
-  - [ ] Respect include/exclude patterns
-- [ ] Inject context into AI prompts
+- [x] Implement system info collection:
+  - [x] OS and version (`uname -a`)
+  - [x] Distribution (parse `/etc/os-release`)
+  - [x] CPU info
+  - [x] Memory info
+  - [x] Disk usage
+- [x] Implement `ai sysinfo` command
+- [x] Implement service listing:
+  - [x] Detect init system (systemd, init, launchd)
+  - [x] List running services
+- [x] Implement `ai services` command
+- [x] Implement package listing:
+  - [x] Detect package manager
+  - [x] List key packages
+- [x] Implement `ai packages` command
+- [x] Implement file reader:
+  - [x] Size-limited reading
+  - [x] Respect include/exclude patterns
+- [x] Inject context into AI prompts
 - [ ] Write unit tests
 
 ### 3.4 Per-Project Config (`.aishellrc`)

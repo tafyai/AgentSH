@@ -225,8 +225,22 @@ impl ShellRunner {
         match route {
             InputRoute::Ai(cmd) => {
                 if let Some(ref mut orchestrator) = self.ai_orchestrator {
-                    // Update context
-                    let context = AiContext::default();
+                    // Update context with current state
+                    let mut context = AiContext::default();
+
+                    // For ai fix, include last command error info
+                    if matches!(cmd.mode, crate::ai_orchestrator::QueryMode::Fix) {
+                        if let Some(last_cmd) = self.execution_engine.last_command() {
+                            context.last_command = Some(last_cmd.to_string());
+                        }
+                        if let Some(exit_code) = self.execution_engine.last_exit_code() {
+                            context.last_exit_code = Some(exit_code);
+                        }
+                        if let Some(stderr) = self.execution_engine.last_stderr() {
+                            context.last_stderr = Some(stderr.to_string());
+                        }
+                    }
+
                     orchestrator.update_context(context);
 
                     // Query AI
@@ -290,6 +304,15 @@ impl ShellRunner {
                     orchestrator.clear_history();
                     println!("AI conversation cleared.");
                 }
+            }
+            InternalCommand::SysInfo => {
+                println!("{}", crate::context::get_sysinfo());
+            }
+            InternalCommand::Services => {
+                println!("{}", crate::context::get_services());
+            }
+            InternalCommand::Packages => {
+                println!("{}", crate::context::get_packages());
             }
         }
     }
