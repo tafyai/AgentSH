@@ -1,0 +1,39 @@
+# agentsh per-project configuration example
+# Place in your project root as .aishellrc
+
+# Project-specific context
+[context]
+# Files to always include in AI context for this project
+include_files = [
+    "README.md",
+    "Makefile",
+    "docker-compose.yml",
+    "src/main.rs",
+    "Cargo.toml",
+]
+
+# Patterns to exclude from context
+exclude_patterns = [
+    "*.log",
+    "target/*",
+    ".git/*",
+    "node_modules/*",
+]
+
+# Domain hint helps AI understand your project type
+# Options: web-app, api, cli, devops, database, ml, etc.
+domain_hint = "rust-cli"
+
+# Override AI settings for this project
+[ai]
+# Use a faster model for this project
+# model = "gpt-3.5-turbo"
+
+# Increase max tokens for complex tasks
+# max_tokens = 4096
+
+# Project-specific safety settings
+[safety]
+# Example: require extra caution for production configs
+# require_confirmation_for_destructive = true
+# require_confirmation_for_sudo = true
