@@ -214,10 +214,10 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
   - [x] Handle `y` - accept
   - [x] Handle `e` - edit mode
   - [x] Handle `n` - cancel
-- [ ] Implement edit mode:
-  - [ ] Show each command
-  - [ ] Allow editing
-  - [ ] Allow skipping steps
+- [x] Implement edit mode:
+  - [x] Show each command
+  - [x] Allow editing
+  - [x] Allow skipping steps
 - [x] Implement command execution:
   - [x] Write command to PTY
   - [x] Stream output to user

@@ -100,26 +100,26 @@ impl ExecutionEngine {
         // Get user confirmation
         let response = self.prompt_confirmation()?;
 
-        match response {
+        let steps_to_run = match response {
             UserResponse::Reject => {
                 println!("Cancelled.");
                 return Err(ExecutionError::Cancelled);
             }
             UserResponse::Edit => {
-                // TODO: Implement edit mode
-                println!("Edit mode not yet implemented. Running as-is.");
+                // Edit mode: allow user to modify/skip each step
+                self.edit_steps(&action.steps)?
             }
-            UserResponse::Accept => {}
+            UserResponse::Accept => action.steps.clone(),
             UserResponse::Skip => {
                 return Ok(vec![]);
             }
-        }
+        };
 
         // Execute each step
         let mut results = Vec::new();
 
-        for (i, step) in action.steps.iter().enumerate() {
-            println!("\n[{}/{}] {}", i + 1, action.steps.len(), step.description);
+        for (i, step) in steps_to_run.iter().enumerate() {
+            println!("\n[{}/{}] {}", i + 1, steps_to_run.len(), step.description);
 
             // Analyze command for safety
             let flags = safety::analyze_command(&step.shell_command, &self.config.safety);
@@ -285,6 +285,81 @@ impl ExecutionEngine {
             .map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
 
         Ok(input.trim().to_lowercase() == "yes")
+    }
+
+    /// Edit steps interactively before execution
+    fn edit_steps(&self, steps: &[Step]) -> Result<Vec<Step>> {
+        println!("\n--- Edit Mode ---");
+        println!("For each step: [Enter] to keep, [e] to edit, [s] to skip, [q] to quit\n");
+
+        let mut edited_steps = Vec::new();
+
+        for (i, step) in steps.iter().enumerate() {
+            println!("Step {}/{}: {}", i + 1, steps.len(), step.description);
+            println!("  Command: {}", step.shell_command);
+            print!("  [Enter/e/s/q]: ");
+            io::stdout()
+                .flush()
+                .map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
+
+            let mut input = String::new();
+            io::stdin()
+                .read_line(&mut input)
+                .map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
+
+            match input.trim().to_lowercase().as_str() {
+                "" | "k" | "keep" => {
+                    // Keep as-is
+                    edited_steps.push(step.clone());
+                }
+                "e" | "edit" => {
+                    // Edit the command
+                    print!("  New command: ");
+                    io::stdout()
+                        .flush()
+                        .map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
+
+                    let mut new_cmd = String::new();
+                    io::stdin()
+                        .read_line(&mut new_cmd)
+                        .map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
+
+                    let new_cmd = new_cmd.trim();
+                    if !new_cmd.is_empty() {
+                        let mut edited_step = step.clone();
+                        edited_step.shell_command = new_cmd.to_string();
+                        edited_steps.push(edited_step);
+                        println!("  ✓ Updated");
+                    } else {
+                        // Empty input means keep original
+                        edited_steps.push(step.clone());
+                        println!("  ✓ Kept original");
+                    }
+                }
+                "s" | "skip" => {
+                    println!("  ✗ Skipped");
+                }
+                "q" | "quit" => {
+                    println!("\nEdit cancelled.");
+                    return Err(ExecutionError::Cancelled);
+                }
+                _ => {
+                    // Unknown input, keep the step
+                    edited_steps.push(step.clone());
+                }
+            }
+        }
+
+        if edited_steps.is_empty() {
+            println!("\nNo steps to execute.");
+            return Err(ExecutionError::Cancelled);
+        }
+
+        println!(
+            "\n--- {} step(s) ready to execute ---\n",
+            edited_steps.len()
+        );
+        Ok(edited_steps)
     }
 
     /// Execute a single step
