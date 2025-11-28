@@ -2,9 +2,11 @@
 //!
 //! Handles spawning and communicating with the underlying shell via PTY.
 
+#![allow(dead_code)]
+
 use crate::config::Config;
 use crate::error::PtyError;
-use portable_pty::{native_pty_system, CommandBuilder, PtySize, MasterPty, Child};
+use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use std::io::{Read, Write};
 use std::thread;
 use tracing::{debug, error, info, warn};
@@ -92,13 +94,19 @@ impl PtyShell {
         let _guard = RawModeGuard;
 
         // Get reader and writer from master
-        let mut reader = self.master.try_clone_reader()
+        let mut reader = self
+            .master
+            .try_clone_reader()
             .map_err(|e| PtyError::Read(e.to_string()))?;
-        let mut writer = self.master.take_writer()
+        let mut writer = self
+            .master
+            .take_writer()
             .map_err(|e| PtyError::Write(e.to_string()))?;
 
         // Clone for resize handling
-        let master_for_resize = self.master.try_clone_reader()
+        let master_for_resize = self
+            .master
+            .try_clone_reader()
             .map_err(|e| PtyError::Create(e.to_string()))?;
         drop(master_for_resize); // We just needed to verify clone works
 
@@ -168,14 +176,14 @@ impl PtyShell {
 
     /// Write data to the PTY
     pub fn write(&self, data: &[u8]) -> Result<()> {
-        let mut writer = self.master.take_writer()
+        let mut writer = self
+            .master
+            .take_writer()
             .map_err(|e| PtyError::Write(e.to_string()))?;
         writer
             .write_all(data)
             .map_err(|e| PtyError::Write(e.to_string()))?;
-        writer
-            .flush()
-            .map_err(|e| PtyError::Write(e.to_string()))?;
+        writer.flush().map_err(|e| PtyError::Write(e.to_string()))?;
         Ok(())
     }
 
@@ -196,12 +204,14 @@ impl Drop for RawModeGuard {
 
 /// Get current terminal size
 fn get_terminal_size() -> Option<PtySize> {
-    crossterm::terminal::size().ok().map(|(cols, rows)| PtySize {
-        rows,
-        cols,
-        pixel_width: 0,
-        pixel_height: 0,
-    })
+    crossterm::terminal::size()
+        .ok()
+        .map(|(cols, rows)| PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
 }
 
 /// Set up environment variables for the child shell

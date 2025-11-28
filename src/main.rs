@@ -6,12 +6,12 @@ use anyhow::Result;
 use clap::Parser;
 use tracing::{error, info};
 
+mod ai_orchestrator;
 mod cli;
 mod config;
 mod context;
 mod error;
 mod execution_engine;
-mod ai_orchestrator;
 mod input_router;
 mod logging;
 mod pty;
@@ -42,11 +42,12 @@ async fn main() -> Result<()> {
     };
 
     // Determine shell to spawn
-    let shell = args.shell.unwrap_or_else(|| {
-        config.mode.shell.clone().unwrap_or_else(|| {
-            std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
-        })
-    });
+    let shell =
+        args.shell.unwrap_or_else(|| {
+            config.mode.shell.clone().unwrap_or_else(|| {
+                std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
+            })
+        });
 
     info!("Using shell: {}", shell);
 

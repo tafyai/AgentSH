@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use tracing::debug;
 
 /// Main configuration structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct Config {
     pub ai: AiConfig,
@@ -205,21 +205,6 @@ pub struct PluginConfig {
 
 // Default implementations
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            ai: AiConfig::default(),
-            mode: ModeConfig::default(),
-            safety: SafetyConfig::default(),
-            ui: UiConfig::default(),
-            context: ContextConfig::default(),
-            history: HistoryConfig::default(),
-            keys: KeyConfig::default(),
-            plugins: PluginConfig::default(),
-        }
-    }
-}
-
 impl Default for AiConfig {
     fn default() -> Self {
         Self {
@@ -329,7 +314,7 @@ impl Default for ContextConfig {
                 "target/*".to_string(),
                 ".git/*".to_string(),
             ],
-            max_file_size: 100 * 1024, // 100KB
+            max_file_size: 100 * 1024,    // 100KB
             max_context_size: 512 * 1024, // 512KB
             history_lines: 20,
             domain_hint: String::new(),
@@ -415,6 +400,7 @@ impl Config {
     }
 
     /// Load and merge project config (.aishellrc)
+    #[allow(dead_code)]
     pub fn load_project_config(&mut self, dir: &Path) -> Result<(), ConfigError> {
         let project_config = dir.join(".aishellrc");
         if project_config.exists() {
@@ -496,6 +482,7 @@ impl Config {
     }
 
     /// Validate configuration
+    #[allow(dead_code)]
     pub fn validate(&self) -> Result<(), ConfigError> {
         // Validate AI config
         if self.ai.provider.is_empty() {

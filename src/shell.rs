@@ -2,7 +2,7 @@
 //!
 //! Manages the interactive shell session with AI command interception.
 
-use crate::ai_orchestrator::{AiOrchestrator, AiContext};
+use crate::ai_orchestrator::{AiContext, AiOrchestrator};
 use crate::config::Config;
 use crate::error::PtyError;
 use crate::execution_engine::ExecutionEngine;
@@ -43,7 +43,10 @@ impl ShellRunner {
         let ai_orchestrator = if config.get_api_key().is_some() {
             Some(AiOrchestrator::new(config.clone()))
         } else {
-            warn!("No API key found in {}, AI features disabled", config.ai.api_key_env);
+            warn!(
+                "No API key found in {}, AI features disabled",
+                config.ai.api_key_env
+            );
             None
         };
 
@@ -89,9 +92,13 @@ impl ShellRunner {
         info!("Shell spawned successfully");
 
         // Get reader/writer
-        let mut reader = pair.master.try_clone_reader()
+        let mut reader = pair
+            .master
+            .try_clone_reader()
             .map_err(|e| PtyError::Read(e.to_string()))?;
-        let mut writer = pair.master.take_writer()
+        let mut writer = pair
+            .master
+            .take_writer()
             .map_err(|e| PtyError::Write(e.to_string()))?;
 
         // Flag to signal shutdown
@@ -99,8 +106,7 @@ impl ShellRunner {
         let running_clone = running.clone();
 
         // Enable raw mode
-        crossterm::terminal::enable_raw_mode()
-            .map_err(|e| PtyError::Create(e.to_string()))?;
+        crossterm::terminal::enable_raw_mode().map_err(|e| PtyError::Create(e.to_string()))?;
         let _guard = RawModeGuard;
 
         // Thread to copy PTY output to stdout
@@ -142,7 +148,9 @@ impl ShellRunner {
                                 let line = String::from_utf8_lossy(&line_buf).to_string();
 
                                 // Check if this is an AI command
-                                if self.ai_mode == AiMode::Assist && input_router::is_ai_command(&line) {
+                                if self.ai_mode == AiMode::Assist
+                                    && input_router::is_ai_command(&line)
+                                {
                                     // Don't send to shell, handle AI command
                                     line_buf.clear();
 
@@ -208,7 +216,10 @@ impl ShellRunner {
     }
 
     /// Handle an AI command
-    async fn handle_ai_command(&mut self, input: &str) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    async fn handle_ai_command(
+        &mut self,
+        input: &str,
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let route = input_router::route_input(input);
 
         match route {
@@ -235,7 +246,10 @@ impl ShellRunner {
                         }
                     }
                 } else {
-                    eprintln!("AI is not available. Set {} environment variable.", self.config.ai.api_key_env);
+                    eprintln!(
+                        "AI is not available. Set {} environment variable.",
+                        self.config.ai.api_key_env
+                    );
                 }
             }
             InputRoute::Internal(cmd) => {
@@ -252,21 +266,19 @@ impl ShellRunner {
     /// Handle internal commands
     fn handle_internal_command(&mut self, cmd: InternalCommand) {
         match cmd {
-            InternalCommand::SetMode(mode) => {
-                match mode.as_str() {
-                    "off" => {
-                        self.ai_mode = AiMode::Off;
-                        println!("AI mode: off");
-                    }
-                    "assist" => {
-                        self.ai_mode = AiMode::Assist;
-                        println!("AI mode: assist");
-                    }
-                    _ => {
-                        println!("Unknown mode: {}. Use 'off' or 'assist'.", mode);
-                    }
+            InternalCommand::SetMode(mode) => match mode.as_str() {
+                "off" => {
+                    self.ai_mode = AiMode::Off;
+                    println!("AI mode: off");
                 }
-            }
+                "assist" => {
+                    self.ai_mode = AiMode::Assist;
+                    println!("AI mode: assist");
+                }
+                _ => {
+                    println!("Unknown mode: {}. Use 'off' or 'assist'.", mode);
+                }
+            },
             InternalCommand::Help => {
                 input_router::show_help();
             }
@@ -294,20 +306,22 @@ impl Drop for RawModeGuard {
 
 /// Get current terminal size
 fn get_terminal_size() -> Option<PtySize> {
-    crossterm::terminal::size().ok().map(|(cols, rows)| PtySize {
-        rows,
-        cols,
-        pixel_width: 0,
-        pixel_height: 0,
-    })
+    crossterm::terminal::size()
+        .ok()
+        .map(|(cols, rows)| PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
 }
 
 /// Set up environment for child shell
 fn setup_environment(cmd: &mut CommandBuilder) {
     for (key, value) in std::env::vars() {
         match key.as_str() {
-            "HOME" | "USER" | "LOGNAME" | "PATH" | "LANG" | "LC_ALL" | "LC_CTYPE" |
-            "TERM" | "EDITOR" | "VISUAL" | "PAGER" | "SHELL" | "ZDOTDIR" | "BASH_ENV" => {
+            "HOME" | "USER" | "LOGNAME" | "PATH" | "LANG" | "LC_ALL" | "LC_CTYPE" | "TERM"
+            | "EDITOR" | "VISUAL" | "PAGER" | "SHELL" | "ZDOTDIR" | "BASH_ENV" => {
                 cmd.env(&key, &value);
             }
             k if k.ends_with("_API_KEY") || k.ends_with("_TOKEN") => {

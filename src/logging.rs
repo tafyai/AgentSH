@@ -3,6 +3,8 @@
 //! Handles logging of AI-generated commands and execution results
 //! for auditing and debugging purposes.
 
+#![allow(dead_code)]
+
 use crate::ai_orchestrator::AiAction;
 use crate::config::SafetyConfig;
 use crate::execution_engine::StepResult;
@@ -23,7 +25,10 @@ static SESSION_ID: Lazy<String> = Lazy::new(|| Uuid::new_v4().to_string());
 static SECRET_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         // API keys and tokens
-        Regex::new(r#"(?i)(api[_-]?key|token|secret|password|passwd|pwd)\s*[=:]\s*['"]?([^'"\s]+)['"]?"#).unwrap(),
+        Regex::new(
+            r#"(?i)(api[_-]?key|token|secret|password|passwd|pwd)\s*[=:]\s*['"]?([^'"\s]+)['"]?"#,
+        )
+        .unwrap(),
         // Bearer tokens
         Regex::new(r"(?i)bearer\s+[a-zA-Z0-9._-]+").unwrap(),
         // AWS keys
@@ -213,7 +218,7 @@ impl AuditLogger {
     }
 
     /// Log an error
-    pub fn log_error(&mut self, request: &str, error: &str) {
+    pub fn log_error(&mut self, request: &str, _error: &str) {
         if !self.config.log_ai_generated_commands {
             return;
         }

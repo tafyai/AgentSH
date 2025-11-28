@@ -3,7 +3,9 @@
 //! Handles the execution of AI-proposed commands with user confirmation,
 //! safety checks, and output streaming.
 
-use crate::ai_orchestrator::{AiAction, ActionKind, Step};
+#![allow(dead_code)]
+
+use crate::ai_orchestrator::{ActionKind, AiAction, Step};
 use crate::config::Config;
 use crate::error::ExecutionError;
 use crate::safety::{self, SafetyFlags};
@@ -132,11 +134,11 @@ impl ExecutionEngine {
             }
 
             // Check if extra confirmation needed
-            if self.needs_extra_confirmation(&flags, step) {
-                if !self.confirm_dangerous_step(step, &flags)? {
-                    println!("Step skipped.");
-                    continue;
-                }
+            if self.needs_extra_confirmation(&flags, step)
+                && !self.confirm_dangerous_step(step, &flags)?
+            {
+                println!("Step skipped.");
+                continue;
             }
 
             // Check sudo policy
@@ -230,9 +232,12 @@ impl ExecutionEngine {
     }
 
     /// Prompt user for confirmation
+    #[allow(clippy::only_used_in_recursion)]
     fn prompt_confirmation(&self) -> Result<UserResponse> {
         print!("Run these? [y/e/n] ");
-        io::stdout().flush().map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
+        io::stdout()
+            .flush()
+            .map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
 
         let mut input = String::new();
         io::stdin()
@@ -270,7 +275,9 @@ impl ExecutionEngine {
 
         println!("\nCommand: {}", step.shell_command);
         print!("\nType 'yes' to confirm: ");
-        io::stdout().flush().map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
+        io::stdout()
+            .flush()
+            .map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
 
         let mut input = String::new();
         io::stdin()
@@ -342,9 +349,12 @@ impl ExecutionEngine {
     }
 
     /// Prompt for action on failure
+    #[allow(clippy::only_used_in_recursion)]
     fn prompt_failure_action(&self) -> Result<FailureAction> {
         print!("Step failed. [c]ontinue / [r]etry / [a]bort? ");
-        io::stdout().flush().map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
+        io::stdout()
+            .flush()
+            .map_err(|e| ExecutionError::CommandFailed(e.to_string()))?;
 
         let mut input = String::new();
         io::stdin()

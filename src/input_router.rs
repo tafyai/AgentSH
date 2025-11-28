@@ -3,64 +3,47 @@
 //! Handles routing of user input between the shell and AI,
 //! including detection of AI commands and line editing.
 
+#![allow(dead_code)]
+
 use crate::ai_orchestrator::QueryMode;
-use regex::Regex;
 use once_cell::sync::Lazy;
+use regex::Regex;
 
 /// AI command prefix patterns
-static AI_PREFIX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^(@?ai\s+)").unwrap()
-});
+static AI_PREFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(@?ai\s+)").unwrap());
 
 /// AI run command pattern
-static AI_RUN: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^@?ai\s+run\s+["']?(.+?)["']?\s*$"#).unwrap()
-});
+static AI_RUN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"^@?ai\s+run\s+["']?(.+?)["']?\s*$"#).unwrap());
 
 /// AI explain command pattern
-static AI_EXPLAIN: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^@?ai\s+explain\s+['"]?(.+?)['"]?\s*$"#).unwrap()
-});
+static AI_EXPLAIN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"^@?ai\s+explain\s+['"]?(.+?)['"]?\s*$"#).unwrap());
 
 /// AI do command pattern
-static AI_DO: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^@?ai\s+do\s+["']?(.+?)["']?\s*$"#).unwrap()
-});
+static AI_DO: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"^@?ai\s+do\s+["']?(.+?)["']?\s*$"#).unwrap());
 
 /// AI fix command pattern
-static AI_FIX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^@?ai\s+fix\s*$").unwrap()
-});
+static AI_FIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^@?ai\s+fix\s*$").unwrap());
 
 /// AI sysinfo command pattern
-static AI_SYSINFO: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^@?ai\s+sysinfo\s*$").unwrap()
-});
+static AI_SYSINFO: Lazy<Regex> = Lazy::new(|| Regex::new(r"^@?ai\s+sysinfo\s*$").unwrap());
 
 /// AI services command pattern
-static AI_SERVICES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^@?ai\s+services\s*$").unwrap()
-});
+static AI_SERVICES: Lazy<Regex> = Lazy::new(|| Regex::new(r"^@?ai\s+services\s*$").unwrap());
 
 /// AI packages command pattern
-static AI_PACKAGES: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^@?ai\s+packages\s*$").unwrap()
-});
+static AI_PACKAGES: Lazy<Regex> = Lazy::new(|| Regex::new(r"^@?ai\s+packages\s*$").unwrap());
 
 /// AI mode command pattern
-static AI_MODE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^@?ai\s+mode\s+(\w+)\s*$").unwrap()
-});
+static AI_MODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^@?ai\s+mode\s+(\w+)\s*$").unwrap());
 
 /// AI help command pattern
-static AI_HELP: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^@?ai\s+(help|\?)\s*$").unwrap()
-});
+static AI_HELP: Lazy<Regex> = Lazy::new(|| Regex::new(r"^@?ai\s+(help|\?)\s*$").unwrap());
 
 /// AI history command pattern
-static AI_HISTORY: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^@?ai\s+history\s*$").unwrap()
-});
+static AI_HISTORY: Lazy<Regex> = Lazy::new(|| Regex::new(r"^@?ai\s+history\s*$").unwrap());
 
 /// Routing decision for user input
 #[derive(Debug, Clone)]
@@ -106,7 +89,10 @@ pub fn route_input(input: &str) -> InputRoute {
 
     // Check for AI mode switch
     if let Some(caps) = AI_MODE.captures(trimmed) {
-        let mode = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
+        let mode = caps
+            .get(1)
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
         return InputRoute::Internal(InternalCommand::SetMode(mode));
     }
 
@@ -117,7 +103,10 @@ pub fn route_input(input: &str) -> InputRoute {
 
     // Check for AI run command
     if let Some(caps) = AI_RUN.captures(trimmed) {
-        let query = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
+        let query = caps
+            .get(1)
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
         return InputRoute::Ai(AiCommand {
             mode: QueryMode::Run,
             query,
@@ -126,16 +115,24 @@ pub fn route_input(input: &str) -> InputRoute {
 
     // Check for AI explain command
     if let Some(caps) = AI_EXPLAIN.captures(trimmed) {
-        let command = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
+        let command = caps
+            .get(1)
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
         return InputRoute::Ai(AiCommand {
-            mode: QueryMode::Explain { command: command.clone() },
+            mode: QueryMode::Explain {
+                command: command.clone(),
+            },
             query: command,
         });
     }
 
     // Check for AI do command
     if let Some(caps) = AI_DO.captures(trimmed) {
-        let query = caps.get(1).map(|m| m.as_str().to_string()).unwrap_or_default();
+        let query = caps
+            .get(1)
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
         return InputRoute::Ai(AiCommand {
             mode: QueryMode::Do,
             query,
@@ -206,7 +203,8 @@ pub fn extract_query(input: &str) -> Option<String> {
 
 /// Show AI help text
 pub fn show_help() {
-    println!(r#"
+    println!(
+        r#"
 agentsh - AI-powered shell assistant
 
 COMMANDS:
@@ -238,7 +236,8 @@ KEYBINDINGS:
   Alt-M                   Toggle AI mode
 
 For more info: https://github.com/yourusername/agentsh
-"#);
+"#
+    );
 }
 
 #[cfg(test)]
@@ -355,7 +354,10 @@ mod tests {
 
     #[test]
     fn test_extract_query() {
-        assert_eq!(extract_query("ai hello world"), Some("hello world".to_string()));
+        assert_eq!(
+            extract_query("ai hello world"),
+            Some("hello world".to_string())
+        );
         assert_eq!(extract_query("@ai hello"), Some("hello".to_string()));
         assert_eq!(extract_query("ls -la"), None);
     }

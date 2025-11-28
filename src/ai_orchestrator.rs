@@ -3,6 +3,8 @@
 //! Handles communication with the LLM backend, prompt construction,
 //! and parsing of AI responses.
 
+#![allow(dead_code)]
+
 use crate::config::Config;
 use crate::error::AiError;
 use serde::{Deserialize, Serialize};
@@ -186,7 +188,10 @@ impl AiOrchestrator {
 
         // Add conversation history (limited)
         let history_limit = 10;
-        let start = self.conversation_history.len().saturating_sub(history_limit);
+        let start = self
+            .conversation_history
+            .len()
+            .saturating_sub(history_limit);
         messages.extend(self.conversation_history[start..].iter().cloned());
 
         // Add current user message
@@ -353,7 +358,7 @@ fn build_user_message(input: &str, context: &AiContext, mode: &QueryMode) -> Str
 }
 
 /// Parse AI response into AiAction
-fn parse_ai_response(response: &str, mode: &QueryMode) -> Result<AiAction> {
+fn parse_ai_response(response: &str, _mode: &QueryMode) -> Result<AiAction> {
     // Try to parse as JSON directly
     if let Ok(action) = serde_json::from_str::<AiAction>(response) {
         return Ok(action);

@@ -3,6 +3,8 @@
 //! Gathers system context information to provide to the AI,
 //! including OS info, current directory, and file contents.
 
+#![allow(dead_code)]
+
 use crate::config::ContextConfig;
 use std::path::Path;
 use std::process::Command;
@@ -60,7 +62,10 @@ impl SystemContext {
     pub fn format_for_prompt(&self) -> String {
         let mut output = String::new();
 
-        output.push_str(&format!("OS: {} {} ({})\n", self.os.name, self.os.version, self.os.arch));
+        output.push_str(&format!(
+            "OS: {} {} ({})\n",
+            self.os.name, self.os.version, self.os.arch
+        ));
         output.push_str(&format!("Kernel: {}\n", self.os.kernel));
         output.push_str(&format!("User: {}@{}\n", self.user, self.hostname));
         output.push_str(&format!("CWD: {}\n", self.cwd));
@@ -125,9 +130,8 @@ fn get_os_version() -> Option<String> {
 
 /// Get hostname
 fn get_hostname() -> String {
-    get_command_output("hostname", &[]).unwrap_or_else(|| {
-        std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string())
-    })
+    get_command_output("hostname", &[])
+        .unwrap_or_else(|| std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string()))
 }
 
 /// Run a command and get its output
@@ -186,7 +190,10 @@ fn read_file_context(path: &Path, config: &ContextConfig) -> Option<FileContext>
         Ok(content) => {
             let truncated = content.len() as u64 > config.max_file_size;
             let content = if truncated {
-                content.chars().take(config.max_file_size as usize).collect()
+                content
+                    .chars()
+                    .take(config.max_file_size as usize)
+                    .collect()
             } else {
                 content
             };
@@ -221,7 +228,10 @@ pub fn get_sysinfo() -> String {
         if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
             for line in cpuinfo.lines() {
                 if line.starts_with("model name") {
-                    output.push_str(&format!("CPU: {}\n", line.split(':').nth(1).unwrap_or("").trim()));
+                    output.push_str(&format!(
+                        "CPU: {}\n",
+                        line.split(':').nth(1).unwrap_or("").trim()
+                    ));
                     break;
                 }
             }
@@ -273,7 +283,15 @@ pub fn get_services() -> String {
     output.push_str("=== Running Services ===\n\n");
 
     // Try systemctl first (Linux with systemd)
-    if let Some(services) = get_command_output("systemctl", &["list-units", "--type=service", "--state=running", "--no-pager"]) {
+    if let Some(services) = get_command_output(
+        "systemctl",
+        &[
+            "list-units",
+            "--type=service",
+            "--state=running",
+            "--no-pager",
+        ],
+    ) {
         output.push_str(&services);
         return output;
     }
@@ -308,13 +326,16 @@ pub fn get_packages() -> String {
     ];
 
     for (pm, args) in package_managers {
-        if let Some(packages) = get_command_output(pm, &args.iter().map(|s| *s).collect::<Vec<_>>()) {
+        if let Some(packages) = get_command_output(pm, &args.to_vec()) {
             output.push_str(&format!("Package manager: {}\n\n", pm));
             // Limit output
             let lines: Vec<&str> = packages.lines().take(50).collect();
             output.push_str(&lines.join("\n"));
             if packages.lines().count() > 50 {
-                output.push_str(&format!("\n\n... and {} more packages", packages.lines().count() - 50));
+                output.push_str(&format!(
+                    "\n\n... and {} more packages",
+                    packages.lines().count() - 50
+                ));
             }
             return output;
         }

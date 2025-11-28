@@ -1,5 +1,7 @@
 //! Error types for agentsh
 
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 /// Main error type for agentsh

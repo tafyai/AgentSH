@@ -28,6 +28,7 @@ pub struct SafetyFlags {
 
 impl SafetyFlags {
     /// Check if any safety concern was raised
+    #[allow(dead_code)]
     pub fn has_concerns(&self) -> bool {
         self.is_destructive
             || self.requires_sudo
@@ -38,6 +39,7 @@ impl SafetyFlags {
     }
 
     /// Get a summary of concerns
+    #[allow(dead_code)]
     pub fn summary(&self) -> Vec<&'static str> {
         let mut concerns = Vec::new();
         if self.is_destructive {
@@ -65,39 +67,39 @@ impl SafetyFlags {
 /// Destructive filesystem patterns
 static DESTRUCTIVE_FS_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
-        Regex::new(r"rm\s+.*-[rR]").unwrap(),           // rm -r, rm -R
-        Regex::new(r"rm\s+-[^-]*f").unwrap(),           // rm -f
-        Regex::new(r"rm\s+/").unwrap(),                 // rm / (anything in root)
-        Regex::new(r"rmdir\s+--ignore-fail").unwrap(),  // rmdir with force
-        Regex::new(r"find\s+.*-delete").unwrap(),       // find -delete
-        Regex::new(r"find\s+.*-exec\s+rm").unwrap(),    // find -exec rm
-        Regex::new(r">\s*/dev/sd[a-z]").unwrap(),       // redirect to block device
-        Regex::new(r"mv\s+/\s").unwrap(),               // mv / (moving root)
-        Regex::new(r"chmod\s+-R\s+777").unwrap(),       // chmod -R 777
-        Regex::new(r"chown\s+-R").unwrap(),             // chown -R
+        Regex::new(r"rm\s+.*-[rR]").unwrap(),          // rm -r, rm -R
+        Regex::new(r"rm\s+-[^-]*f").unwrap(),          // rm -f
+        Regex::new(r"rm\s+/").unwrap(),                // rm / (anything in root)
+        Regex::new(r"rmdir\s+--ignore-fail").unwrap(), // rmdir with force
+        Regex::new(r"find\s+.*-delete").unwrap(),      // find -delete
+        Regex::new(r"find\s+.*-exec\s+rm").unwrap(),   // find -exec rm
+        Regex::new(r">\s*/dev/sd[a-z]").unwrap(),      // redirect to block device
+        Regex::new(r"mv\s+/\s").unwrap(),              // mv / (moving root)
+        Regex::new(r"chmod\s+-R\s+777").unwrap(),      // chmod -R 777
+        Regex::new(r"chown\s+-R").unwrap(),            // chown -R
     ]
 });
 
 /// Block device patterns
 static BLOCK_DEVICE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
-        Regex::new(r"dd\s+.*of=/dev/").unwrap(),        // dd to device
-        Regex::new(r"mkfs").unwrap(),                   // any mkfs
-        Regex::new(r"fdisk").unwrap(),                  // fdisk
-        Regex::new(r"parted").unwrap(),                 // parted
-        Regex::new(r"wipefs").unwrap(),                 // wipefs
-        Regex::new(r"shred\s+/dev/").unwrap(),          // shred device
+        Regex::new(r"dd\s+.*of=/dev/").unwrap(), // dd to device
+        Regex::new(r"mkfs").unwrap(),            // any mkfs
+        Regex::new(r"fdisk").unwrap(),           // fdisk
+        Regex::new(r"parted").unwrap(),          // parted
+        Regex::new(r"wipefs").unwrap(),          // wipefs
+        Regex::new(r"shred\s+/dev/").unwrap(),   // shred device
     ]
 });
 
 /// Network/firewall patterns
 static NETWORK_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
-        Regex::new(r"iptables\s+-F").unwrap(),          // flush rules
+        Regex::new(r"iptables\s+-F").unwrap(), // flush rules
         Regex::new(r"iptables\s+-P\s+\w+\s+DROP").unwrap(), // default drop
-        Regex::new(r"ufw\s+disable").unwrap(),          // disable firewall
+        Regex::new(r"ufw\s+disable").unwrap(), // disable firewall
         Regex::new(r"firewall-cmd\s+--panic").unwrap(), // panic mode
-        Regex::new(r"nft\s+flush").unwrap(),            // nftables flush
+        Regex::new(r"nft\s+flush").unwrap(),   // nftables flush
     ]
 });
 
@@ -108,12 +110,12 @@ static CRITICAL_SERVICE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(r"systemctl\s+(stop|restart|disable)\s+sshd").unwrap(),
         Regex::new(r"service\s+ssh\s+(stop|restart)").unwrap(),
         Regex::new(r"service\s+sshd\s+(stop|restart)").unwrap(),
-        Regex::new(r"kill\s+-9\s+1\b").unwrap(),        // kill init
-        Regex::new(r"pkill\s+.*init").unwrap(),         // pkill init
-        Regex::new(r"systemctl\s+.*halt").unwrap(),     // system halt
-        Regex::new(r"shutdown").unwrap(),               // shutdown
-        Regex::new(r"reboot").unwrap(),                 // reboot
-        Regex::new(r"init\s+[06]").unwrap(),            // init 0/6
+        Regex::new(r"kill\s+-9\s+1\b").unwrap(), // kill init
+        Regex::new(r"pkill\s+.*init").unwrap(),  // pkill init
+        Regex::new(r"systemctl\s+.*halt").unwrap(), // system halt
+        Regex::new(r"shutdown").unwrap(),        // shutdown
+        Regex::new(r"reboot").unwrap(),          // reboot
+        Regex::new(r"init\s+[06]").unwrap(),     // init 0/6
     ]
 });
 
@@ -134,9 +136,7 @@ static PACKAGE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
 });
 
 /// Sudo detection pattern
-static SUDO_PATTERN: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(^|\||\&\&|\;)\s*sudo\s").unwrap()
-});
+static SUDO_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"(^|\||\&\&|\;)\s*sudo\s").unwrap());
 
 /// Analyze a command for safety concerns
 pub fn analyze_command(cmd: &str, config: &SafetyConfig) -> SafetyFlags {
@@ -147,7 +147,9 @@ pub fn analyze_command(cmd: &str, config: &SafetyConfig) -> SafetyFlags {
         if let Ok(re) = Regex::new(pattern) {
             if re.is_match(cmd) {
                 flags.is_blocked = true;
-                flags.warnings.push(format!("Command matches blocked pattern: {}", pattern));
+                flags
+                    .warnings
+                    .push(format!("Command matches blocked pattern: {}", pattern));
                 return flags; // Blocked commands stop analysis
             }
         }
@@ -156,14 +158,18 @@ pub fn analyze_command(cmd: &str, config: &SafetyConfig) -> SafetyFlags {
     // Check for sudo
     if SUDO_PATTERN.is_match(cmd) || cmd.trim().starts_with("sudo ") {
         flags.requires_sudo = true;
-        flags.warnings.push("Command requires elevated privileges".to_string());
+        flags
+            .warnings
+            .push("Command requires elevated privileges".to_string());
     }
 
     // Check destructive filesystem operations
     for pattern in DESTRUCTIVE_FS_PATTERNS.iter() {
         if pattern.is_match(cmd) {
             flags.is_destructive = true;
-            flags.warnings.push("Command may delete or modify files".to_string());
+            flags
+                .warnings
+                .push("Command may delete or modify files".to_string());
             break;
         }
     }
@@ -172,7 +178,9 @@ pub fn analyze_command(cmd: &str, config: &SafetyConfig) -> SafetyFlags {
     for pattern in BLOCK_DEVICE_PATTERNS.iter() {
         if pattern.is_match(cmd) {
             flags.is_destructive = true;
-            flags.warnings.push("Command operates on block devices".to_string());
+            flags
+                .warnings
+                .push("Command operates on block devices".to_string());
             break;
         }
     }
@@ -181,7 +189,9 @@ pub fn analyze_command(cmd: &str, config: &SafetyConfig) -> SafetyFlags {
     for pattern in NETWORK_PATTERNS.iter() {
         if pattern.is_match(cmd) {
             flags.is_destructive = true;
-            flags.warnings.push("Command modifies network/firewall configuration".to_string());
+            flags
+                .warnings
+                .push("Command modifies network/firewall configuration".to_string());
             break;
         }
     }
@@ -190,7 +200,9 @@ pub fn analyze_command(cmd: &str, config: &SafetyConfig) -> SafetyFlags {
     for pattern in CRITICAL_SERVICE_PATTERNS.iter() {
         if pattern.is_match(cmd) {
             flags.affects_critical_service = true;
-            flags.warnings.push("Command affects critical system services".to_string());
+            flags
+                .warnings
+                .push("Command affects critical system services".to_string());
             break;
         }
     }
@@ -199,7 +211,9 @@ pub fn analyze_command(cmd: &str, config: &SafetyConfig) -> SafetyFlags {
     for pattern in PACKAGE_PATTERNS.iter() {
         if pattern.is_match(cmd) {
             flags.modifies_packages = true;
-            flags.warnings.push("Command modifies installed packages".to_string());
+            flags
+                .warnings
+                .push("Command modifies installed packages".to_string());
             break;
         }
     }
@@ -209,7 +223,9 @@ pub fn analyze_command(cmd: &str, config: &SafetyConfig) -> SafetyFlags {
         let expanded = shellexpand_path(path);
         if cmd.contains(&expanded) {
             flags.modifies_protected_path = true;
-            flags.warnings.push(format!("Command affects protected path: {}", path));
+            flags
+                .warnings
+                .push(format!("Command affects protected path: {}", path));
         }
     }
 
@@ -227,6 +243,7 @@ fn shellexpand_path(path: &str) -> String {
 }
 
 /// Check if a command should be blocked entirely
+#[allow(dead_code)]
 pub fn is_command_blocked(cmd: &str, config: &SafetyConfig) -> bool {
     for pattern in &config.blocked_patterns {
         if let Ok(re) = Regex::new(pattern) {
