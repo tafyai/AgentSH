@@ -29,6 +29,8 @@ pub struct ShellRunner {
     ai_mode: AiMode,
     ai_orchestrator: Option<AiOrchestrator>,
     execution_engine: ExecutionEngine,
+    /// Track the last known directory for project config loading
+    last_cwd: Option<std::path::PathBuf>,
 }
 
 impl ShellRunner {
@@ -57,6 +59,7 @@ impl ShellRunner {
             ai_mode,
             ai_orchestrator,
             execution_engine,
+            last_cwd: std::env::current_dir().ok(),
         }
     }
 
@@ -220,6 +223,9 @@ impl ShellRunner {
         &mut self,
         input: &str,
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        // Check for directory change and reload project config
+        self.check_project_config();
+
         let route = input_router::route_input(input);
 
         match route {
@@ -275,6 +281,35 @@ impl ShellRunner {
         }
 
         Ok(())
+    }
+
+    /// Check if directory changed and reload project config if needed
+    fn check_project_config(&mut self) {
+        if let Ok(current_cwd) = std::env::current_dir() {
+            let changed = match &self.last_cwd {
+                Some(last) => last != &current_cwd,
+                None => true,
+            };
+
+            if changed {
+                // Load project config from new directory
+                if let Err(e) = self.config.load_project_config(&current_cwd) {
+                    warn!("Failed to load project config: {}", e);
+                } else if current_cwd.join(".aishellrc").exists() {
+                    info!("Loaded project config from {:?}", current_cwd);
+                }
+
+                // Update AI orchestrator with new config
+                if let Some(ref mut orchestrator) = self.ai_orchestrator {
+                    *orchestrator = AiOrchestrator::new(self.config.clone());
+                }
+
+                // Update execution engine with new config
+                self.execution_engine = ExecutionEngine::new(self.config.clone());
+
+                self.last_cwd = Some(current_cwd);
+            }
+        }
     }
 
     /// Handle internal commands

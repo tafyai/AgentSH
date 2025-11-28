@@ -337,21 +337,21 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
 
 ### 3.4 Per-Project Config (`.aishellrc`)
 
-- [ ] Detect directory changes:
-  - [ ] Monitor PWD changes
-  - [ ] Or hook into cd command
-- [ ] Load `.aishellrc` when entering directory
-- [ ] Merge project config with base config
-- [ ] Unload when leaving directory
+- [x] Detect directory changes:
+  - [x] Monitor PWD changes
+  - [x] Or hook into cd command
+- [x] Load `.aishellrc` when entering directory
+- [x] Merge project config with base config
+- [x] Unload when leaving directory
 - [ ] Test config inheritance
 
 ### Phase 3 Acceptance Criteria
-- [ ] `ai do` executes multi-step plans
-- [ ] Progress shown during execution
-- [ ] Failures handled with recovery options
-- [ ] `ai fix` diagnoses and proposes fixes
-- [ ] `ai sysinfo/services/packages` work
-- [ ] Per-project config loads on cd
+- [x] `ai do` executes multi-step plans
+- [x] Progress shown during execution
+- [x] Failures handled with recovery options
+- [x] `ai fix` diagnoses and proposes fixes
+- [x] `ai sysinfo/services/packages` work
+- [x] Per-project config loads on cd
 
 ---
 
