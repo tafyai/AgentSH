@@ -397,24 +397,24 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
 
 ### 4.3 Plugin System (`src/plugins/`)
 
-- [ ] Define plugin protocol:
-  - [ ] JSON request format
-  - [ ] JSON response format
-- [ ] Implement plugin loader:
-  - [ ] Scan plugin directory
-  - [ ] Validate plugin executables
-  - [ ] Register available tools
-- [ ] Implement plugin executor:
-  - [ ] Spawn plugin process
-  - [ ] Send request via stdin
-  - [ ] Read response from stdout
-  - [ ] Handle timeouts
-- [ ] Implement built-in tools:
-  - [ ] `cmd.run`
-  - [ ] `fs.read_file`
-  - [ ] `fs.write_file`
-  - [ ] `pkg.manage`
-  - [ ] `svc.manage`
+- [x] Define plugin protocol:
+  - [x] JSON request format (PluginRequest with id, tool, params, context)
+  - [x] JSON response format (PluginResponse with success, result, error, output)
+- [x] Implement plugin loader:
+  - [x] Scan plugin directory
+  - [x] Validate plugin executables
+  - [x] Load manifest.json for tool definitions
+  - [x] Register available tools
+- [x] Implement plugin executor:
+  - [x] Spawn plugin process
+  - [x] Send request via stdin
+  - [x] Read response from stdout
+  - [x] Handle timeouts
+- [x] Implement built-in tools:
+  - [x] `cmd.run` - Run shell commands
+  - [x] `fs.read_file` - Read file contents
+  - [x] `fs.write_file` - Write/append to files
+  - [x] `fs.list_dir` - List directory contents
 - [ ] Update AI prompt with available tools
 - [ ] Write plugin examples
 - [ ] Document plugin API

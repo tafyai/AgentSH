@@ -14,6 +14,7 @@ mod error;
 mod execution_engine;
 mod input_router;
 mod logging;
+mod plugins;
 mod pty;
 mod safety;
 mod shell;
