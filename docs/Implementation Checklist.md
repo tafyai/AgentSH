@@ -393,7 +393,7 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
   - [x] Enable/disable
   - [x] Max size
   - [x] Retention count
-- [ ] Write unit tests
+- [x] Write unit tests (18 tests covering serialization, redaction, file ops)
 
 ### 4.3 Plugin System (`src/plugins/`)
 

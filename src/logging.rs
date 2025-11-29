@@ -355,6 +355,9 @@ fn truncate_preview(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ai_orchestrator::{ActionKind, Step};
+    use std::io::Read;
+    use tempfile::TempDir;
 
     #[test]
     fn test_redact_api_key() {
@@ -372,6 +375,45 @@ mod tests {
     }
 
     #[test]
+    fn test_redact_password() {
+        let text = "password=mysecretpassword123";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("mysecretpassword123"));
+    }
+
+    #[test]
+    fn test_redact_aws_key() {
+        let text = "export AWS_KEY=AKIAIOSFODNN7EXAMPLE";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("AKIAIOSFODNN7EXAMPLE"));
+    }
+
+    #[test]
+    fn test_redact_token() {
+        let text = "token: ghp_abcdefghijklmnopqrstuvwxyz123456";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+    }
+
+    #[test]
+    fn test_redact_private_key() {
+        let text = "-----BEGIN RSA PRIVATE KEY-----\ndata\n-----END RSA PRIVATE KEY-----";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+    }
+
+    #[test]
+    fn test_no_redact_normal_text() {
+        let text = "ls -la /home/user";
+        let redacted = redact_secrets(text);
+        // Short alphanumeric strings should not be redacted
+        assert!(redacted.contains("ls"));
+        assert!(redacted.contains("home"));
+    }
+
+    #[test]
     fn test_truncate_preview() {
         let short = "short text";
         assert_eq!(truncate_preview(short), short);
@@ -383,10 +425,208 @@ mod tests {
     }
 
     #[test]
+    fn test_truncate_exact_boundary() {
+        let exact = "b".repeat(500);
+        let truncated = truncate_preview(&exact);
+        assert_eq!(truncated, exact); // Should not truncate at exactly 500
+    }
+
+    #[test]
     fn test_session_id() {
         let id1 = AuditLogger::session_id();
         let id2 = AuditLogger::session_id();
         assert_eq!(id1, id2); // Same session
         assert!(!id1.is_empty());
+    }
+
+    #[test]
+    fn test_session_id_format() {
+        let id = AuditLogger::session_id();
+        // UUID format: 8-4-4-4-12
+        assert_eq!(id.len(), 36);
+        assert_eq!(id.chars().filter(|c| *c == '-').count(), 4);
+    }
+
+    #[test]
+    fn test_log_entry_serialization() {
+        let entry = LogEntry {
+            session_id: "test-session".to_string(),
+            timestamp: Utc::now(),
+            event: LogEvent::Query,
+            user: "testuser".to_string(),
+            cwd: "/home/test".to_string(),
+            request: "ai list files".to_string(),
+            ai_action: None,
+            executed_commands: vec![],
+            duration_ms: None,
+        };
+
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("test-session"));
+        assert!(json.contains("testuser"));
+        assert!(json.contains("query"));
+    }
+
+    #[test]
+    fn test_log_entry_with_commands() {
+        let entry = LogEntry {
+            session_id: "test-session".to_string(),
+            timestamp: Utc::now(),
+            event: LogEvent::Execute,
+            user: "testuser".to_string(),
+            cwd: "/home/test".to_string(),
+            request: "ai list files".to_string(),
+            ai_action: None,
+            executed_commands: vec![ExecutedCommand {
+                command: "ls -la".to_string(),
+                exit_code: 0,
+                stdout_preview: Some("file1\nfile2".to_string()),
+                stderr_preview: None,
+            }],
+            duration_ms: Some(100),
+        };
+
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("ls -la"));
+        assert!(json.contains("exit_code"));
+        assert!(json.contains("100"));
+    }
+
+    #[test]
+    fn test_log_event_types() {
+        let query = LogEvent::Query;
+        let execute = LogEvent::Execute;
+        let blocked = LogEvent::Blocked;
+        let error = LogEvent::Error;
+
+        assert_eq!(
+            serde_json::to_string(&query).unwrap(),
+            "\"query\""
+        );
+        assert_eq!(
+            serde_json::to_string(&execute).unwrap(),
+            "\"execute\""
+        );
+        assert_eq!(
+            serde_json::to_string(&blocked).unwrap(),
+            "\"blocked\""
+        );
+        assert_eq!(
+            serde_json::to_string(&error).unwrap(),
+            "\"error\""
+        );
+    }
+
+    #[test]
+    fn test_audit_logger_disabled() {
+        let mut config = SafetyConfig::default();
+        config.log_ai_generated_commands = false;
+
+        let mut logger = AuditLogger::new(config);
+
+        // These should not panic or write anything
+        let action = AiAction {
+            kind: ActionKind::AnswerOnly,
+            summary: Some("test".to_string()),
+            steps: vec![],
+        };
+        logger.log_query("test", &action);
+        logger.log_blocked("test", "cmd", "reason");
+        logger.log_error("test", "error");
+    }
+
+    #[test]
+    fn test_audit_logger_creates_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let log_path = temp_dir.path().join("subdir/commands.log");
+
+        let mut config = SafetyConfig::default();
+        config.log_ai_generated_commands = true;
+        config.log_path = log_path.clone();
+
+        let mut logger = AuditLogger::new(config);
+
+        let action = AiAction {
+            kind: ActionKind::AnswerOnly,
+            summary: Some("test answer".to_string()),
+            steps: vec![],
+        };
+        logger.log_query("test query", &action);
+
+        // Verify directory was created and file exists
+        assert!(log_path.exists());
+    }
+
+    #[test]
+    fn test_audit_logger_writes_json() {
+        let temp_dir = TempDir::new().unwrap();
+        let log_path = temp_dir.path().join("commands.log");
+
+        let mut config = SafetyConfig::default();
+        config.log_ai_generated_commands = true;
+        config.log_path = log_path.clone();
+        config.redact_secrets = false;
+
+        let mut logger = AuditLogger::new(config);
+
+        let action = AiAction {
+            kind: ActionKind::CommandSequence,
+            summary: Some("list files".to_string()),
+            steps: vec![Step {
+                id: "1".to_string(),
+                description: "List all files".to_string(),
+                shell_command: "ls -la".to_string(),
+                needs_confirmation: false,
+                is_destructive: false,
+                requires_sudo: false,
+                working_directory: None,
+            }],
+        };
+        logger.log_query("ai list files", &action);
+
+        // Read and verify log content
+        drop(logger); // Ensure file is flushed
+        let mut content = String::new();
+        File::open(&log_path).unwrap().read_to_string(&mut content).unwrap();
+
+        assert!(content.contains("ai list files"));
+        assert!(content.contains("ls -la"));
+        assert!(content.contains("command_sequence"));
+    }
+
+    #[test]
+    fn test_audit_logger_redacts_secrets() {
+        let temp_dir = TempDir::new().unwrap();
+        let log_path = temp_dir.path().join("commands.log");
+
+        let mut config = SafetyConfig::default();
+        config.log_ai_generated_commands = true;
+        config.log_path = log_path.clone();
+        config.redact_secrets = true;
+
+        let mut logger = AuditLogger::new(config);
+
+        let action = AiAction {
+            kind: ActionKind::CommandSequence,
+            summary: Some("set API key".to_string()),
+            steps: vec![Step {
+                id: "1".to_string(),
+                description: "Export API key".to_string(),
+                shell_command: "export API_KEY=sk-secretkey12345678901234567890".to_string(),
+                needs_confirmation: false,
+                is_destructive: false,
+                requires_sudo: false,
+                working_directory: None,
+            }],
+        };
+        logger.log_query("ai set api key to sk-secretkey12345678901234567890", &action);
+
+        // Read and verify secrets are redacted
+        drop(logger);
+        let mut content = String::new();
+        File::open(&log_path).unwrap().read_to_string(&mut content).unwrap();
+
+        assert!(!content.contains("sk-secretkey"));
+        assert!(content.contains("[REDACTED]"));
     }
 }
