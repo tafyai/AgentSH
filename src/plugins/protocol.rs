@@ -181,8 +181,11 @@ mod tests {
 
     #[test]
     fn test_plugin_request_with_context() {
-        let req = PluginRequest::new("test", HashMap::new())
-            .with_context("/home/user", "testuser", "session-123");
+        let req = PluginRequest::new("test", HashMap::new()).with_context(
+            "/home/user",
+            "testuser",
+            "session-123",
+        );
 
         let ctx = req.context.unwrap();
         assert_eq!(ctx.cwd, "/home/user");
@@ -238,15 +241,13 @@ mod tests {
         let tool = ToolDefinition {
             name: "fs.read_file".to_string(),
             description: "Read a file".to_string(),
-            parameters: vec![
-                ParameterDef {
-                    name: "path".to_string(),
-                    param_type: "string".to_string(),
-                    description: "File path".to_string(),
-                    required: true,
-                    default: None,
-                },
-            ],
+            parameters: vec![ParameterDef {
+                name: "path".to_string(),
+                param_type: "string".to_string(),
+                description: "File path".to_string(),
+                required: true,
+                default: None,
+            }],
             requires_confirmation: false,
             is_destructive: false,
         };

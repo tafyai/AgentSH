@@ -57,7 +57,10 @@ impl PluginExecutor {
             request.context = Some(ctx);
         }
 
-        debug!("Executing plugin '{}' for tool '{}'", plugin.name, tool_name);
+        debug!(
+            "Executing plugin '{}' for tool '{}'",
+            plugin.name, tool_name
+        );
 
         // Spawn plugin process
         let mut child = Command::new(&plugin.path)
@@ -94,7 +97,9 @@ impl PluginExecutor {
         request_id: &str,
         timeout: Duration,
     ) -> Result<PluginResponse, String> {
-        let stdout = child.stdout.take()
+        let stdout = child
+            .stdout
+            .take()
             .ok_or("Failed to capture plugin stdout")?;
 
         let reader = BufReader::new(stdout);
@@ -187,7 +192,9 @@ pub fn execute_with_timeout(
     }
 
     // Read response
-    let stdout = child.stdout.take()
+    let stdout = child
+        .stdout
+        .take()
         .ok_or("Failed to capture plugin stdout")?;
 
     let reader = BufReader::new(stdout);

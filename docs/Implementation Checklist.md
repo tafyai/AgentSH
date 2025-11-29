@@ -34,10 +34,10 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
 - [x] Add `regex` for pattern matching
 
 ### CI/CD Setup
-- [ ] Create `.github/workflows/ci.yml`
-- [ ] Configure `cargo fmt` check
-- [ ] Configure `cargo clippy` check
-- [ ] Configure `cargo test` run
+- [x] Create `.github/workflows/ci.yml`
+- [x] Configure `cargo fmt` check
+- [x] Configure `cargo clippy` check
+- [x] Configure `cargo test` run
 - [ ] Add code coverage (optional: `tarpaulin` or `llvm-cov`)
 
 ### Initial Documentation

@@ -209,9 +209,7 @@ impl ExecutionError {
                     reason
                 )
             }
-            ExecutionError::Cancelled => {
-                "Execution cancelled by user.".to_string()
-            }
+            ExecutionError::Cancelled => "Execution cancelled by user.".to_string(),
             ExecutionError::StepFailed { step, reason } => {
                 format!(
                     "Step '{}' failed: {}\n\

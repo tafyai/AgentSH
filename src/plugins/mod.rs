@@ -6,12 +6,12 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
+mod builtin;
+mod executor;
 mod loader;
 mod protocol;
-mod executor;
-mod builtin;
 
+pub use builtin::BuiltinTools;
+pub use executor::PluginExecutor;
 pub use loader::PluginLoader;
 pub use protocol::{PluginRequest, PluginResponse, ToolDefinition};
-pub use executor::PluginExecutor;
-pub use builtin::BuiltinTools;

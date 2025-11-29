@@ -90,12 +90,12 @@ static DESTRUCTIVE_FS_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(r"chmod\s+-R\s+777").unwrap(),      // chmod -R 777
         Regex::new(r"chown\s+-R").unwrap(),            // chown -R
         // Additional filesystem patterns
-        Regex::new(r"truncate\s+").unwrap(),           // truncate files
+        Regex::new(r"truncate\s+").unwrap(), // truncate files
         Regex::new(r">\s*/dev/null\s+2>&1\s*<").unwrap(), // overwrite with null
-        Regex::new(r"cat\s+/dev/zero").unwrap(),       // overwrite with zeros
-        Regex::new(r"cat\s+/dev/urandom").unwrap(),    // overwrite with random
-        Regex::new(r":\s*>\s*\S+").unwrap(),           // truncate via :>
-        Regex::new(r"rsync\s+.*--delete").unwrap(),    // rsync with delete
+        Regex::new(r"cat\s+/dev/zero").unwrap(), // overwrite with zeros
+        Regex::new(r"cat\s+/dev/urandom").unwrap(), // overwrite with random
+        Regex::new(r":\s*>\s*\S+").unwrap(), // truncate via :>
+        Regex::new(r"rsync\s+.*--delete").unwrap(), // rsync with delete
     ]
 });
 

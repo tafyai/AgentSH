@@ -93,7 +93,10 @@ impl PluginLoader {
             } else if bin.exists() {
                 bin
             } else {
-                return Err(format!("No executable found in plugin directory: {:?}", plugin_path));
+                return Err(format!(
+                    "No executable found in plugin directory: {:?}",
+                    plugin_path
+                ));
             }
         } else {
             return Err(format!("Plugin not found: {}", name));
@@ -324,7 +327,9 @@ mod tests {
         let config = test_config(&temp_dir);
 
         let mut loader = PluginLoader::new(config);
-        loader.tools.insert("test.tool".to_string(), "test".to_string());
+        loader
+            .tools
+            .insert("test.tool".to_string(), "test".to_string());
 
         assert!(loader.has_tool("test.tool"));
         assert!(!loader.has_tool("missing.tool"));
@@ -345,7 +350,9 @@ mod tests {
         };
 
         loader.plugins.insert("test".to_string(), info);
-        loader.tools.insert("test.tool".to_string(), "test".to_string());
+        loader
+            .tools
+            .insert("test.tool".to_string(), "test".to_string());
 
         let plugin = loader.get_plugin_for_tool("test.tool");
         assert!(plugin.is_some());

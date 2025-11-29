@@ -499,22 +499,10 @@ mod tests {
         let blocked = LogEvent::Blocked;
         let error = LogEvent::Error;
 
-        assert_eq!(
-            serde_json::to_string(&query).unwrap(),
-            "\"query\""
-        );
-        assert_eq!(
-            serde_json::to_string(&execute).unwrap(),
-            "\"execute\""
-        );
-        assert_eq!(
-            serde_json::to_string(&blocked).unwrap(),
-            "\"blocked\""
-        );
-        assert_eq!(
-            serde_json::to_string(&error).unwrap(),
-            "\"error\""
-        );
+        assert_eq!(serde_json::to_string(&query).unwrap(), "\"query\"");
+        assert_eq!(serde_json::to_string(&execute).unwrap(), "\"execute\"");
+        assert_eq!(serde_json::to_string(&blocked).unwrap(), "\"blocked\"");
+        assert_eq!(serde_json::to_string(&error).unwrap(), "\"error\"");
     }
 
     #[test]
@@ -587,7 +575,10 @@ mod tests {
         // Read and verify log content
         drop(logger); // Ensure file is flushed
         let mut content = String::new();
-        File::open(&log_path).unwrap().read_to_string(&mut content).unwrap();
+        File::open(&log_path)
+            .unwrap()
+            .read_to_string(&mut content)
+            .unwrap();
 
         assert!(content.contains("ai list files"));
         assert!(content.contains("ls -la"));
@@ -619,12 +610,18 @@ mod tests {
                 working_directory: None,
             }],
         };
-        logger.log_query("ai set api key to sk-secretkey12345678901234567890", &action);
+        logger.log_query(
+            "ai set api key to sk-secretkey12345678901234567890",
+            &action,
+        );
 
         // Read and verify secrets are redacted
         drop(logger);
         let mut content = String::new();
-        File::open(&log_path).unwrap().read_to_string(&mut content).unwrap();
+        File::open(&log_path)
+            .unwrap()
+            .read_to_string(&mut content)
+            .unwrap();
 
         assert!(!content.contains("sk-secretkey"));
         assert!(content.contains("[REDACTED]"));

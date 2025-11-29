@@ -142,13 +142,17 @@ impl BuiltinTools {
 
         let mut file = match fs::File::open(path) {
             Ok(f) => f,
-            Err(e) => return PluginResponse::error(&request.id, &format!("Failed to open file: {}", e)),
+            Err(e) => {
+                return PluginResponse::error(&request.id, &format!("Failed to open file: {}", e))
+            }
         };
 
         let mut buffer = vec![0u8; max_size];
         let bytes_read = match file.read(&mut buffer) {
             Ok(n) => n,
-            Err(e) => return PluginResponse::error(&request.id, &format!("Failed to read file: {}", e)),
+            Err(e) => {
+                return PluginResponse::error(&request.id, &format!("Failed to read file: {}", e))
+            }
         };
 
         buffer.truncate(bytes_read);
@@ -214,7 +218,12 @@ impl BuiltinTools {
 
         let entries = match fs::read_dir(path) {
             Ok(entries) => entries,
-            Err(e) => return PluginResponse::error(&request.id, &format!("Failed to read directory: {}", e)),
+            Err(e) => {
+                return PluginResponse::error(
+                    &request.id,
+                    &format!("Failed to read directory: {}", e),
+                )
+            }
         };
 
         let mut files: Vec<serde_json::Value> = Vec::new();
@@ -289,7 +298,9 @@ impl BuiltinTools {
 
         let output = match cmd.output() {
             Ok(o) => o,
-            Err(e) => return PluginResponse::error(&request.id, &format!("Failed to run command: {}", e)),
+            Err(e) => {
+                return PluginResponse::error(&request.id, &format!("Failed to run command: {}", e))
+            }
         };
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -471,10 +482,7 @@ mod tests {
 
     #[test]
     fn test_run_command() {
-        let request = make_request(
-            "cmd.run",
-            &[("command", serde_json::json!("echo hello"))],
-        );
+        let request = make_request("cmd.run", &[("command", serde_json::json!("echo hello"))]);
 
         let response = BuiltinTools::execute(&request);
 
@@ -498,8 +506,8 @@ mod tests {
         assert!(response.success);
         // The output should contain the temp dir path
         let output = response.output.unwrap();
-        assert!(output.contains(temp_dir.path().to_str().unwrap()) ||
-                output.contains("private")); // macOS uses /private/var/...
+        assert!(output.contains(temp_dir.path().to_str().unwrap()) || output.contains("private"));
+        // macOS uses /private/var/...
     }
 
     #[test]
