@@ -433,8 +433,8 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
   - [ ] Alt-A for AI mode
   - [ ] Alt-M for mode toggle
   - [ ] Configurable bindings
-- [ ] Add progress spinners for AI calls
-- [ ] Improve error messages
+- [x] Add progress spinners for AI calls (Spinner, ProgressIndicator)
+- [x] Improve error messages with user-friendly tips
 - [ ] Add `--help` for AI commands
 
 ### 4.5 Testing & Quality

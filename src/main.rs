@@ -18,6 +18,7 @@ mod plugins;
 mod pty;
 mod safety;
 mod shell;
+mod spinner;
 
 use cli::Args;
 use config::Config;
