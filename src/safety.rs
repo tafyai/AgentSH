@@ -20,6 +20,10 @@ pub struct SafetyFlags {
     pub modifies_packages: bool,
     /// Command modifies protected paths
     pub modifies_protected_path: bool,
+    /// Command affects database (DROP, TRUNCATE, etc.)
+    pub affects_database: bool,
+    /// Command modifies network/firewall
+    pub affects_network: bool,
     /// Command is in the blocked list
     pub is_blocked: bool,
     /// Specific warnings about the command
@@ -35,6 +39,8 @@ impl SafetyFlags {
             || self.affects_critical_service
             || self.modifies_packages
             || self.modifies_protected_path
+            || self.affects_database
+            || self.affects_network
             || self.is_blocked
     }
 
@@ -57,6 +63,12 @@ impl SafetyFlags {
         if self.modifies_protected_path {
             concerns.push("PROTECTED PATH");
         }
+        if self.affects_database {
+            concerns.push("DATABASE");
+        }
+        if self.affects_network {
+            concerns.push("NETWORK/FIREWALL");
+        }
         if self.is_blocked {
             concerns.push("BLOCKED");
         }
@@ -77,6 +89,13 @@ static DESTRUCTIVE_FS_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(r"mv\s+/\s").unwrap(),              // mv / (moving root)
         Regex::new(r"chmod\s+-R\s+777").unwrap(),      // chmod -R 777
         Regex::new(r"chown\s+-R").unwrap(),            // chown -R
+        // Additional filesystem patterns
+        Regex::new(r"truncate\s+").unwrap(),           // truncate files
+        Regex::new(r">\s*/dev/null\s+2>&1\s*<").unwrap(), // overwrite with null
+        Regex::new(r"cat\s+/dev/zero").unwrap(),       // overwrite with zeros
+        Regex::new(r"cat\s+/dev/urandom").unwrap(),    // overwrite with random
+        Regex::new(r":\s*>\s*\S+").unwrap(),           // truncate via :>
+        Regex::new(r"rsync\s+.*--delete").unwrap(),    // rsync with delete
     ]
 });
 
@@ -100,6 +119,28 @@ static NETWORK_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(r"ufw\s+disable").unwrap(), // disable firewall
         Regex::new(r"firewall-cmd\s+--panic").unwrap(), // panic mode
         Regex::new(r"nft\s+flush").unwrap(),   // nftables flush
+        // Additional network patterns
+        Regex::new(r"ip\s+route\s+(del|flush)").unwrap(), // delete routes
+        Regex::new(r"ip\s+addr\s+(del|flush)").unwrap(),  // delete addresses
+        Regex::new(r"ip\s+link\s+set\s+\w+\s+down").unwrap(), // bring interface down
+        Regex::new(r"ifconfig\s+\w+\s+down").unwrap(),    // legacy interface down
+        Regex::new(r"route\s+del").unwrap(),              // delete route
+        Regex::new(r"iptables\s+-X").unwrap(),            // delete chains
+        Regex::new(r"iptables\s+-D").unwrap(),            // delete rules
+    ]
+});
+
+/// Database patterns
+static DATABASE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
+    vec![
+        Regex::new(r"DROP\s+(DATABASE|TABLE|SCHEMA)").unwrap(),
+        Regex::new(r"TRUNCATE\s+TABLE").unwrap(),
+        Regex::new(r"DELETE\s+FROM\s+\w+\s*(;|$)").unwrap(), // DELETE without WHERE
+        Regex::new(r#"mysql\s+.*-e\s*['"].*DROP"#).unwrap(),
+        Regex::new(r#"psql\s+.*-c\s*['"].*DROP"#).unwrap(),
+        Regex::new(r#"mongo\s+.*--eval\s*['"].*drop"#).unwrap(),
+        Regex::new(r"redis-cli\s+.*FLUSHALL").unwrap(),
+        Regex::new(r"redis-cli\s+.*FLUSHDB").unwrap(),
     ]
 });
 
@@ -189,9 +230,22 @@ pub fn analyze_command(cmd: &str, config: &SafetyConfig) -> SafetyFlags {
     for pattern in NETWORK_PATTERNS.iter() {
         if pattern.is_match(cmd) {
             flags.is_destructive = true;
+            flags.affects_network = true;
             flags
                 .warnings
                 .push("Command modifies network/firewall configuration".to_string());
+            break;
+        }
+    }
+
+    // Check database operations
+    for pattern in DATABASE_PATTERNS.iter() {
+        if pattern.is_match(cmd) {
+            flags.is_destructive = true;
+            flags.affects_database = true;
+            flags
+                .warnings
+                .push("Command may destroy database data".to_string());
             break;
         }
     }
@@ -273,6 +327,14 @@ pub fn needs_confirmation(flags: &SafetyFlags, config: &SafetyConfig) -> bool {
         return true; // Always confirm critical services
     }
 
+    if flags.affects_database {
+        return true; // Always confirm database operations
+    }
+
+    if flags.affects_network {
+        return true; // Always confirm network/firewall changes
+    }
+
     false
 }
 
@@ -345,5 +407,59 @@ mod tests {
         let summary = flags.summary();
         assert!(summary.contains(&"DESTRUCTIVE"));
         assert!(summary.contains(&"SUDO"));
+    }
+
+    #[test]
+    fn test_detect_database_drop() {
+        let flags = analyze_command("mysql -e 'DROP DATABASE production'", &test_config());
+        assert!(flags.is_destructive);
+        assert!(flags.affects_database);
+    }
+
+    #[test]
+    fn test_detect_redis_flush() {
+        let flags = analyze_command("redis-cli FLUSHALL", &test_config());
+        assert!(flags.is_destructive);
+        assert!(flags.affects_database);
+    }
+
+    #[test]
+    fn test_detect_sql_truncate() {
+        let flags = analyze_command("psql -c 'TRUNCATE TABLE users'", &test_config());
+        assert!(flags.is_destructive);
+        assert!(flags.affects_database);
+    }
+
+    #[test]
+    fn test_detect_iptables_flush() {
+        let flags = analyze_command("iptables -F", &test_config());
+        assert!(flags.is_destructive);
+        assert!(flags.affects_network);
+    }
+
+    #[test]
+    fn test_detect_interface_down() {
+        let flags = analyze_command("ip link set eth0 down", &test_config());
+        assert!(flags.is_destructive);
+        assert!(flags.affects_network);
+    }
+
+    #[test]
+    fn test_detect_route_delete() {
+        let flags = analyze_command("ip route del default", &test_config());
+        assert!(flags.is_destructive);
+        assert!(flags.affects_network);
+    }
+
+    #[test]
+    fn test_detect_rsync_delete() {
+        let flags = analyze_command("rsync -avz --delete src/ dst/", &test_config());
+        assert!(flags.is_destructive);
+    }
+
+    #[test]
+    fn test_detect_truncate() {
+        let flags = analyze_command("truncate -s 0 /var/log/syslog", &test_config());
+        assert!(flags.is_destructive);
     }
 }

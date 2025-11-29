@@ -250,10 +250,31 @@ impl Default for SafetyConfig {
                 r":\(\)\{\s*:\|:\s*&\s*\}\s*;".to_string(), // Fork bomb
             ],
             protected_paths: vec![
+                // System authentication
                 "/etc/passwd".to_string(),
                 "/etc/shadow".to_string(),
                 "/etc/sudoers".to_string(),
+                "/etc/sudoers.d".to_string(),
+                "/etc/pam.d".to_string(),
+                // SSH
                 "~/.ssh/authorized_keys".to_string(),
+                "~/.ssh/id_rsa".to_string(),
+                "~/.ssh/id_ed25519".to_string(),
+                "~/.ssh/config".to_string(),
+                "/etc/ssh/sshd_config".to_string(),
+                // System config
+                "/etc/fstab".to_string(),
+                "/etc/hosts".to_string(),
+                "/etc/resolv.conf".to_string(),
+                "/etc/network".to_string(),
+                "/etc/netplan".to_string(),
+                // Boot
+                "/boot".to_string(),
+                "/etc/grub".to_string(),
+                // Cron
+                "/etc/crontab".to_string(),
+                "/etc/cron.d".to_string(),
+                "/var/spool/cron".to_string(),
             ],
         }
     }

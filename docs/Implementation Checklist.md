@@ -359,15 +359,16 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
 
 ### 4.1 Safety Hardening
 
-- [ ] Expand destructive patterns:
-  - [ ] Add more filesystem patterns
-  - [ ] Add network patterns
-  - [ ] Add database patterns
-- [ ] Implement protected paths:
-  - [ ] `/etc/passwd`, `/etc/shadow`
-  - [ ] SSH keys
-  - [ ] System configs
-- [ ] Implement blocked command rejection
+- [x] Expand destructive patterns:
+  - [x] Add more filesystem patterns (truncate, rsync --delete, :>)
+  - [x] Add network patterns (ip route del, interface down, iptables -D/-X)
+  - [x] Add database patterns (DROP, TRUNCATE, FLUSHALL, FLUSHDB)
+- [x] Implement protected paths:
+  - [x] `/etc/passwd`, `/etc/shadow`, `/etc/sudoers`
+  - [x] SSH keys (~/.ssh/id_rsa, id_ed25519, config)
+  - [x] System configs (/etc/fstab, /etc/hosts, /boot, cron)
+- [x] Add SafetyFlags for database and network operations
+- [x] Implement blocked command rejection
 - [ ] Add configurable safety levels
 - [ ] Test with fuzzing/edge cases
 
