@@ -42,7 +42,7 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
 
 ### Initial Documentation
 - [x] Create README.md with project description
-- [ ] Add LICENSE file
+- [x] Add LICENSE file (MIT)
 - [ ] Create CONTRIBUTING.md
 - [ ] Create CHANGELOG.md
 
@@ -453,19 +453,19 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
   - [ ] Command latency
   - [ ] Memory usage
   - [ ] PTY throughput
-- [ ] Security audit:
-  - [ ] Code review
-  - [ ] Dependency audit (`cargo audit`)
+- [x] Security audit:
+  - [x] Code review
+  - [x] Dependency audit (`cargo audit`) - 1 unmaintained warning, no vulnerabilities
   - [ ] Fuzzing (optional)
 
 ### Phase 4 Acceptance Criteria
-- [ ] Extended safety patterns work
-- [ ] Logging is complete and configurable
-- [ ] Plugin system loads external tools
-- [ ] Built-in tools work end-to-end
-- [ ] Prompt and UI are polished
-- [ ] Test coverage is adequate
-- [ ] No critical security issues
+- [x] Extended safety patterns work
+- [x] Logging is complete and configurable
+- [x] Plugin system loads external tools
+- [x] Built-in tools work end-to-end
+- [x] Prompt and UI are polished
+- [x] Test coverage is adequate (108 tests)
+- [x] No critical security issues (cargo audit passed)
 
 ---
 
@@ -484,7 +484,7 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
 - [ ] Build Linux ARM64 binary
 - [ ] Build macOS x86_64 binary
 - [ ] Build macOS ARM64 binary
-- [ ] Create installation script
+- [x] Create installation script (scripts/install.sh)
 - [ ] Set up package repositories (optional):
   - [ ] Homebrew formula
   - [ ] AUR package
