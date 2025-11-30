@@ -472,18 +472,18 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
 ## Phase 5: Release Preparation
 
 ### Documentation
-- [ ] Complete all doc files
+- [x] Complete README.md with comprehensive docs
 - [ ] Add inline rustdoc comments
 - [ ] Generate API documentation
-- [ ] Create installation guide
-- [ ] Write troubleshooting guide
+- [x] Create installation guide (in README)
+- [x] Write troubleshooting guide (in README)
 
 ### Packaging
-- [ ] Create release build script
-- [ ] Build Linux x86_64 binary
-- [ ] Build Linux ARM64 binary
-- [ ] Build macOS x86_64 binary
-- [ ] Build macOS ARM64 binary
+- [x] Create release build script (.github/workflows/release.yml)
+- [x] Build Linux x86_64 binary (via GitHub Actions)
+- [x] Build Linux ARM64 binary (via GitHub Actions)
+- [x] Build macOS x86_64 binary (via GitHub Actions)
+- [x] Build macOS ARM64 binary (via GitHub Actions)
 - [x] Create installation script (scripts/install.sh)
 - [ ] Set up package repositories (optional):
   - [ ] Homebrew formula
@@ -491,10 +491,10 @@ A comprehensive checklist for building agentsh from scratch. Tasks are organized
   - [ ] Debian package
 
 ### Release Process
-- [ ] Define versioning scheme (semver)
-- [ ] Create release checklist
-- [ ] Set up GitHub releases
-- [ ] Write release notes template
+- [x] Define versioning scheme (semver - v0.1.0)
+- [x] Create release workflow (.github/workflows/release.yml)
+- [x] Set up GitHub releases (automated via workflow)
+- [x] Write release notes template (auto-generated)
 - [ ] Tag v0.1.0
 
 ### Launch
