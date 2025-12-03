@@ -1,0 +1,97 @@
+# AgentSH Example Configuration
+# Copy to ~/.agentsh/config.yaml and customize
+
+# LLM Provider Settings
+llm:
+  provider: anthropic  # anthropic, openai, ollama
+  model: claude-sonnet-4-20250514
+  api_key_env: ANTHROPIC_API_KEY  # Environment variable containing API key
+  temperature: 0.7
+  max_tokens: 4096
+  timeout_seconds: 60
+  max_retries: 3
+
+  # Fallback if primary provider fails
+  # fallback_provider: ollama
+  # fallback_model: mistral
+
+# Shell Settings
+shell:
+  backend: zsh  # bash, zsh, fish
+  # init_script: ~/.zshrc  # Shell init script to source
+  history_size: 10000
+  ai_prefix: "ai "  # Prefix to force AI routing (e.g., "ai list files")
+  shell_prefix: "!"  # Prefix to force shell routing (e.g., "!ls -la")
+  default_to_ai: false  # If true, unrecognized input goes to AI
+
+# Security Settings
+security:
+  mode: normal  # strict, normal, lenient
+  require_confirmation: true  # Require confirmation for risky commands
+  allow_autonomous: false  # Allow agent to execute without approval
+  # audit_log_path: ~/.agentsh/audit.log
+  max_command_length: 10000
+  approval_timeout_seconds: 60
+
+  # Additional patterns to block (regex)
+  deny_patterns:
+    - "^rm\\s+-rf\\s+/$"
+    - "^mkfs\\."
+
+# Memory Settings
+memory:
+  type: persistent  # in_memory, persistent
+  # db_path: ~/.agentsh/memory.db
+  session_max_entries: 100
+  enable_semantic_search: false  # Requires vector dependencies
+  embedding_model: all-MiniLM-L6-v2
+
+  # Retention periods (days) by memory type
+  retention_days:
+    configuration: 730  # 2 years
+    incident: 365  # 1 year
+    interaction: 90  # 3 months
+
+# Telemetry Settings
+telemetry:
+  enabled: true
+  # log_file: ~/.agentsh/agentsh.log
+  metrics_enabled: false  # Enable Prometheus metrics
+  metrics_port: 9090
+  health_check_interval_seconds: 60
+
+# Multi-Device Orchestration (Phase 8)
+orchestrator:
+  enabled: false
+  # devices_file: ~/.agentsh/devices.yaml
+  ssh_timeout: 30
+  max_parallel_connections: 10
+
+  mcp_server:
+    enabled: false
+    port: 9999
+    auth_token_env: AGENTSH_MCP_TOKEN
+
+# Plugins
+plugins:
+  - name: shell
+    enabled: true
+
+  - name: filesystem
+    enabled: true
+
+  - name: process
+    enabled: true
+
+  - name: code
+    enabled: true
+
+  # Robotics plugin (Phase 9)
+  # - name: robotics
+  #   enabled: false
+  #   config:
+  #     ros_master_uri: http://localhost:11311
+  #     safety_mode: strict
+
+# Global Settings
+log_level: INFO  # DEBUG, INFO, WARNING, ERROR

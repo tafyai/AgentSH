@@ -1,0 +1,8 @@
+"""Telemetry and monitoring for AgentSH."""
+
+from agentsh.telemetry.logger import setup_logging, get_logger
+
+__all__ = [
+    "setup_logging",
+    "get_logger",
+]
