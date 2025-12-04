@@ -1,0 +1,161 @@
+name: application_deploy
+description: Deploy an application with pre-checks, deployment, and verification
+version: "1.0"
+
+parameters:
+  app_path:
+    type: string
+    description: Path to application
+    required: true
+  environment:
+    type: string
+    description: Deployment environment
+    enum: [development, staging, production]
+    default: development
+  run_tests:
+    type: boolean
+    description: Run tests before deployment
+    default: true
+  create_backup:
+    type: boolean
+    description: Create backup before deployment
+    default: true
+  deploy_command:
+    type: string
+    description: Custom deployment command
+    default: ""
+
+steps:
+  # Pre-deployment checks
+  - id: validate_app
+    name: Validate application exists
+    tool: fs.info
+    arguments:
+      path: "{{ app_path }}"
+    required: true
+
+  - id: check_git_status
+    name: Check for uncommitted changes
+    tool: shell.run
+    arguments:
+      command: "cd {{ app_path }} && git status --porcelain"
+      cwd: "{{ app_path }}"
+    continue_on_error: true
+
+  - id: run_tests
+    name: Run test suite
+    condition: "{{ run_tests }}"
+    tool: shell.run
+    arguments:
+      command: |
+        cd {{ app_path }} && \
+        if [ -f "pytest.ini" ] || [ -f "pyproject.toml" ]; then
+          python -m pytest -v
+        elif [ -f "package.json" ]; then
+          npm test
+        elif [ -f "Cargo.toml" ]; then
+          cargo test
+        else
+          echo "No test framework detected"
+        fi
+      cwd: "{{ app_path }}"
+    depends_on: [validate_app]
+    timeout: 300
+
+  # Backup current state
+  - id: backup_current
+    name: Backup current deployment
+    condition: "{{ create_backup and environment != 'development' }}"
+    tool: shell.run
+    arguments:
+      command: "cp -r {{ app_path }} {{ app_path }}.backup.$(date +%Y%m%d_%H%M%S)"
+    depends_on: [run_tests]
+    risk_level: medium
+
+  # Build
+  - id: build_python
+    name: Build Python application
+    condition: "{{ file_exists(app_path + '/setup.py') or file_exists(app_path + '/pyproject.toml') }}"
+    tool: shell.run
+    arguments:
+      command: "cd {{ app_path }} && pip install -e ."
+      cwd: "{{ app_path }}"
+    depends_on: [backup_current]
+
+  - id: build_node
+    name: Build Node.js application
+    condition: "{{ file_exists(app_path + '/package.json') }}"
+    tool: shell.run
+    arguments:
+      command: "cd {{ app_path }} && npm run build"
+      cwd: "{{ app_path }}"
+    depends_on: [backup_current]
+    continue_on_error: true
+
+  - id: build_rust
+    name: Build Rust application
+    condition: "{{ file_exists(app_path + '/Cargo.toml') }}"
+    tool: shell.run
+    arguments:
+      command: "cd {{ app_path }} && cargo build --release"
+      cwd: "{{ app_path }}"
+    depends_on: [backup_current]
+
+  # Deploy
+  - id: custom_deploy
+    name: Run custom deployment command
+    condition: "{{ deploy_command != '' }}"
+    tool: shell.run
+    arguments:
+      command: "{{ deploy_command }}"
+      cwd: "{{ app_path }}"
+    depends_on: [build_python, build_node, build_rust]
+    risk_level: high
+    requires_approval: true
+
+  # Post-deployment verification
+  - id: verify_deployment
+    name: Verify deployment
+    tool: shell.run
+    arguments:
+      command: |
+        cd {{ app_path }} && \
+        echo "Deployment completed for environment: {{ environment }}" && \
+        echo "Current version:" && \
+        git describe --tags --always 2>/dev/null || echo "Not a git repository"
+      cwd: "{{ app_path }}"
+    depends_on: [custom_deploy, build_python, build_node, build_rust]
+
+  - id: health_check
+    name: Run health check
+    condition: "{{ environment != 'development' }}"
+    tool: shell.run
+    arguments:
+      command: |
+        if [ -f "{{ app_path }}/health_check.sh" ]; then
+          bash {{ app_path }}/health_check.sh
+        else
+          echo "No health check script found"
+        fi
+    depends_on: [verify_deployment]
+    continue_on_error: true
+
+on_success:
+  message: "Deployment to {{ environment }} completed successfully!"
+
+on_failure:
+  message: "Deployment failed. Rolling back if backup was created."
+  rollback: true
+  rollback_steps:
+    - id: restore_backup
+      name: Restore from backup
+      condition: "{{ create_backup }}"
+      tool: shell.run
+      arguments:
+        command: |
+          BACKUP=$(ls -t {{ app_path }}.backup.* 2>/dev/null | head -1)
+          if [ -n "$BACKUP" ]; then
+            rm -rf {{ app_path }}
+            mv "$BACKUP" {{ app_path }}
+            echo "Restored from $BACKUP"
+          fi

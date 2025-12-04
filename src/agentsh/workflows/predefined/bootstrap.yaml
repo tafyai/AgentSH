@@ -1,0 +1,153 @@
+name: project_bootstrap
+description: Set up a new project environment with virtual environment, dependencies, and git
+version: "1.0"
+
+parameters:
+  project_type:
+    type: string
+    description: Type of project to bootstrap
+    enum: [python, node, rust, go]
+    default: python
+  project_name:
+    type: string
+    description: Name of the project
+    required: true
+  init_git:
+    type: boolean
+    description: Initialize git repository
+    default: true
+
+steps:
+  - id: detect_project
+    name: Detect existing project files
+    tool: fs.list
+    arguments:
+      path: "."
+      recursive: false
+    continue_on_error: true
+
+  - id: check_project_type
+    name: Verify project type matches
+    condition: "{{ project_type == 'python' }}"
+    tool: fs.search
+    arguments:
+      pattern: "*.py"
+      path: "."
+
+  - id: create_venv_python
+    name: Create Python virtual environment
+    condition: "{{ project_type == 'python' }}"
+    tool: shell.run
+    arguments:
+      command: "python3 -m venv .venv"
+    depends_on: [detect_project]
+
+  - id: create_requirements
+    name: Create requirements.txt if not exists
+    condition: "{{ project_type == 'python' }}"
+    tool: fs.write
+    arguments:
+      path: "requirements.txt"
+      content: |
+        # Project dependencies
+        # Add your dependencies here
+      mode: "create"
+    continue_on_error: true
+
+  - id: install_deps_python
+    name: Install Python dependencies
+    condition: "{{ project_type == 'python' }}"
+    tool: shell.run
+    arguments:
+      command: ".venv/bin/pip install -r requirements.txt"
+    depends_on: [create_venv_python, create_requirements]
+
+  - id: npm_init
+    name: Initialize Node.js project
+    condition: "{{ project_type == 'node' }}"
+    tool: shell.run
+    arguments:
+      command: "npm init -y"
+    depends_on: [detect_project]
+
+  - id: npm_install
+    name: Install Node.js dependencies
+    condition: "{{ project_type == 'node' }}"
+    tool: shell.run
+    arguments:
+      command: "npm install"
+    depends_on: [npm_init]
+    continue_on_error: true
+
+  - id: cargo_init
+    name: Initialize Rust project
+    condition: "{{ project_type == 'rust' }}"
+    tool: shell.run
+    arguments:
+      command: "cargo init {{ project_name }}"
+    depends_on: [detect_project]
+
+  - id: go_mod_init
+    name: Initialize Go module
+    condition: "{{ project_type == 'go' }}"
+    tool: shell.run
+    arguments:
+      command: "go mod init {{ project_name }}"
+    depends_on: [detect_project]
+
+  - id: git_init
+    name: Initialize git repository
+    condition: "{{ init_git }}"
+    tool: shell.run
+    arguments:
+      command: "git init"
+    depends_on: [detect_project]
+
+  - id: create_gitignore
+    name: Create .gitignore
+    condition: "{{ init_git }}"
+    tool: fs.write
+    arguments:
+      path: ".gitignore"
+      content: |
+        # Python
+        __pycache__/
+        *.py[cod]
+        .venv/
+        venv/
+        .env
+
+        # Node
+        node_modules/
+
+        # Rust
+        target/
+
+        # Go
+        vendor/
+
+        # IDE
+        .idea/
+        .vscode/
+        *.swp
+
+        # OS
+        .DS_Store
+        Thumbs.db
+      mode: "create"
+    continue_on_error: true
+    depends_on: [git_init]
+
+  - id: summary
+    name: Generate setup summary
+    tool: shell.run
+    arguments:
+      command: "echo 'Project {{ project_name }} bootstrapped successfully!'"
+    depends_on: [install_deps_python, npm_install, cargo_init, go_mod_init, create_gitignore]
+
+on_success:
+  message: "Project {{ project_name }} has been set up successfully!"
+
+on_failure:
+  message: "Failed to bootstrap project. Check the error messages above."
+  rollback: false

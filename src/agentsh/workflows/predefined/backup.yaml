@@ -1,0 +1,92 @@
+name: directory_backup
+description: Create a timestamped backup of a directory
+version: "1.0"
+
+parameters:
+  source_path:
+    type: string
+    description: Directory to backup
+    required: true
+  backup_dir:
+    type: string
+    description: Directory to store backups
+    default: "~/.agentsh/backups"
+  compress:
+    type: boolean
+    description: Compress the backup with gzip
+    default: true
+  max_backups:
+    type: integer
+    description: Maximum number of backups to keep
+    default: 5
+
+steps:
+  - id: validate_source
+    name: Verify source directory exists
+    tool: fs.info
+    arguments:
+      path: "{{ source_path }}"
+    required: true
+
+  - id: create_backup_dir
+    name: Create backup directory if needed
+    tool: shell.run
+    arguments:
+      command: "mkdir -p {{ backup_dir }}"
+    depends_on: [validate_source]
+
+  - id: generate_timestamp
+    name: Generate backup timestamp
+    tool: shell.run
+    arguments:
+      command: "date +%Y%m%d_%H%M%S"
+    depends_on: [create_backup_dir]
+
+  - id: get_basename
+    name: Get source directory name
+    tool: shell.run
+    arguments:
+      command: "basename {{ source_path }}"
+    depends_on: [validate_source]
+
+  - id: create_backup_compressed
+    name: Create compressed backup
+    condition: "{{ compress }}"
+    tool: shell.run
+    arguments:
+      command: "tar -czf {{ backup_dir }}/$(basename {{ source_path }})_$(date +%Y%m%d_%H%M%S).tar.gz -C $(dirname {{ source_path }}) $(basename {{ source_path }})"
+    depends_on: [generate_timestamp, get_basename]
+    risk_level: medium
+
+  - id: create_backup_uncompressed
+    name: Create uncompressed backup
+    condition: "{{ not compress }}"
+    tool: fs.copy
+    arguments:
+      src: "{{ source_path }}"
+      dst: "{{ backup_dir }}/$(basename {{ source_path }})_$(date +%Y%m%d_%H%M%S)"
+    depends_on: [generate_timestamp, get_basename]
+    risk_level: medium
+
+  - id: cleanup_old_backups
+    name: Remove old backups beyond max_backups
+    tool: shell.run
+    arguments:
+      command: |
+        cd {{ backup_dir }} && ls -t $(basename {{ source_path }})_* 2>/dev/null | tail -n +{{ max_backups + 1 }} | xargs rm -f 2>/dev/null || true
+    depends_on: [create_backup_compressed, create_backup_uncompressed]
+    continue_on_error: true
+
+  - id: list_backups
+    name: List current backups
+    tool: shell.run
+    arguments:
+      command: "ls -lh {{ backup_dir }}/$(basename {{ source_path }})_* 2>/dev/null || echo 'No backups found'"
+    depends_on: [cleanup_old_backups]
+
+on_success:
+  message: "Backup of {{ source_path }} completed successfully!"
+
+on_failure:
+  message: "Backup failed. Please check the source path and permissions."
+  rollback: false
