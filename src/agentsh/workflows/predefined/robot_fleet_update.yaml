@@ -1,0 +1,308 @@
+# Robot Fleet Update Workflow
+# Updates ROS2 packages and configurations across a fleet of robots
+
+name: robot_fleet_update
+description: Update ROS2 packages and configurations across a robot fleet
+version: "1.0"
+
+parameters:
+  - name: ros_distro
+    description: ROS2 distribution (humble, iron, jazzy)
+    required: false
+    type: string
+    default: humble
+
+  - name: workspace_path
+    description: ROS2 workspace path on robots
+    required: false
+    type: string
+    default: ~/ros2_ws
+
+  - name: filter_role
+    description: Filter robots by role (optional)
+    required: false
+    type: string
+
+  - name: filter_labels
+    description: Filter robots by labels as JSON (optional)
+    required: false
+    type: object
+
+  - name: strategy
+    description: Rollout strategy (all_at_once, serial, canary, rolling)
+    required: false
+    type: string
+    default: canary
+
+  - name: canary_count
+    description: Number of canary robots
+    required: false
+    type: integer
+    default: 1
+
+  - name: max_concurrent
+    description: Maximum concurrent updates
+    required: false
+    type: integer
+    default: 2
+
+  - name: rebuild_workspace
+    description: Rebuild ROS2 workspace after update
+    required: false
+    type: boolean
+    default: true
+
+  - name: restart_services
+    description: Restart ROS2 services after update
+    required: false
+    type: boolean
+    default: true
+
+steps:
+  - name: select_robots
+    description: Select target robots
+    action: remote.list_devices
+    parameters:
+      role: "{{ filter_role }}"
+      labels: "{{ filter_labels }}"
+
+  - name: safety_check
+    description: Check robot safety states before update
+    action: remote.run_parallel
+    parameters:
+      command: |
+        echo "=== Robot Safety State ==="
+        # Check if robot is in safe state for update
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        # Check for E-Stop state
+        ros2 topic echo /safety/state --once 2>/dev/null || echo "Safety topic not available"
+
+        # Check if robot is idle
+        ros2 topic echo /robot/state --once 2>/dev/null || echo "State topic not available"
+
+        # Check for active motion
+        VELOCITY=$(ros2 topic echo /cmd_vel --once 2>/dev/null | grep -E 'linear|angular' || echo "0")
+        if echo "$VELOCITY" | grep -qE '[1-9]'; then
+          echo "WARNING: Robot appears to be in motion"
+          exit 1
+        fi
+        echo "Robot appears to be idle and safe for update"
+      timeout: 30
+
+  - name: stop_ros_services
+    description: Stop ROS2 services on robots
+    action: orchestrate
+    parameters:
+      strategy: "{{ strategy }}"
+      canary_count: "{{ canary_count }}"
+      max_concurrent: "{{ max_concurrent }}"
+      command: |
+        echo "Stopping ROS2 services..."
+        # Stop systemd services if configured
+        sudo systemctl stop ros2-robot.service 2>/dev/null || true
+        sudo systemctl stop ros2-navigation.service 2>/dev/null || true
+        sudo systemctl stop ros2-sensors.service 2>/dev/null || true
+
+        # Kill any remaining ROS2 processes
+        pkill -f "ros2" 2>/dev/null || true
+        sleep 2
+
+        # Verify stopped
+        if pgrep -f "ros2" > /dev/null; then
+          echo "WARNING: Some ROS2 processes still running"
+          pgrep -af "ros2"
+        else
+          echo "All ROS2 processes stopped"
+        fi
+      timeout: 60
+      post_check: "! pgrep -f 'ros2'"
+
+  - name: update_ros_packages
+    description: Update ROS2 system packages
+    action: orchestrate
+    parameters:
+      strategy: "{{ strategy }}"
+      canary_count: "{{ canary_count }}"
+      max_concurrent: "{{ max_concurrent }}"
+      command: |
+        echo "Updating ROS2 packages..."
+        sudo apt update
+
+        # Update all ROS2 packages
+        sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y ros-{{ ros_distro }}-*
+
+        echo "ROS2 packages updated"
+      timeout: 600
+      post_check: "dpkg -l | grep ros-{{ ros_distro }}"
+
+  - name: pull_workspace_changes
+    description: Pull latest workspace changes
+    action: orchestrate
+    parameters:
+      strategy: "{{ strategy }}"
+      canary_count: "{{ canary_count }}"
+      max_concurrent: "{{ max_concurrent }}"
+      command: |
+        cd {{ workspace_path }}/src 2>/dev/null || exit 0
+
+        echo "Pulling workspace changes..."
+        for dir in */; do
+          if [ -d "$dir/.git" ]; then
+            echo "Updating $dir..."
+            cd "$dir"
+            git fetch origin
+            git pull --ff-only 2>/dev/null || echo "  Could not fast-forward, skipping"
+            cd ..
+          fi
+        done
+
+        echo "Workspace sources updated"
+      timeout: 300
+
+  - name: rebuild_workspace
+    description: Rebuild ROS2 workspace
+    condition: "{{ rebuild_workspace }}"
+    action: orchestrate
+    parameters:
+      strategy: "{{ strategy }}"
+      canary_count: "{{ canary_count }}"
+      max_concurrent: "{{ max_concurrent }}"
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash
+        cd {{ workspace_path }}
+
+        echo "Rebuilding workspace..."
+        colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+        if [ $? -eq 0 ]; then
+          echo "Workspace rebuilt successfully"
+        else
+          echo "ERROR: Workspace build failed"
+          exit 1
+        fi
+      timeout: 900
+      post_check: "test -d {{ workspace_path }}/install"
+
+  - name: verify_build
+    description: Verify workspace build
+    condition: "{{ rebuild_workspace }}"
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash
+        source {{ workspace_path }}/install/setup.bash
+
+        echo "=== Installed Packages ==="
+        ros2 pkg list | grep -v "^ros2\|^ament\|^rcl" | head -20
+
+        echo ""
+        echo "=== Package Executables ==="
+        for pkg in $(ros2 pkg list | grep -v "^ros2\|^ament\|^rcl" | head -5); do
+          echo "--- $pkg ---"
+          ros2 pkg executables "$pkg" 2>/dev/null || echo "  No executables"
+        done
+      timeout: 60
+
+  - name: start_ros_services
+    description: Start ROS2 services
+    condition: "{{ restart_services }}"
+    action: orchestrate
+    parameters:
+      strategy: "{{ strategy }}"
+      canary_count: "{{ canary_count }}"
+      max_concurrent: "{{ max_concurrent }}"
+      command: |
+        echo "Starting ROS2 services..."
+
+        # Start systemd services if configured
+        sudo systemctl start ros2-robot.service 2>/dev/null || true
+        sudo systemctl start ros2-sensors.service 2>/dev/null || true
+        sudo systemctl start ros2-navigation.service 2>/dev/null || true
+
+        sleep 5
+
+        # Verify services started
+        echo "=== Service Status ==="
+        systemctl is-active ros2-robot.service 2>/dev/null || echo "ros2-robot: not configured"
+        systemctl is-active ros2-sensors.service 2>/dev/null || echo "ros2-sensors: not configured"
+        systemctl is-active ros2-navigation.service 2>/dev/null || echo "ros2-navigation: not configured"
+      timeout: 120
+      post_check: "pgrep -f 'ros2' || true"
+
+  - name: verify_topics
+    description: Verify essential ROS2 topics
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "=== ROS2 Nodes ==="
+        ros2 node list 2>/dev/null || echo "No nodes running"
+
+        echo ""
+        echo "=== Essential Topics ==="
+        for topic in /cmd_vel /odom /scan /tf /robot_description; do
+          if ros2 topic list 2>/dev/null | grep -q "^${topic}$"; then
+            echo "$topic: OK"
+          else
+            echo "$topic: MISSING"
+          fi
+        done
+
+        echo ""
+        echo "=== Topic Message Rates ==="
+        for topic in /odom /scan; do
+          rate=$(ros2 topic hz "$topic" --window 5 2>/dev/null | head -1 || echo "0")
+          echo "$topic: $rate"
+        done
+      timeout: 60
+
+  - name: post_update_safety_check
+    description: Post-update safety verification
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "=== Post-Update Safety Check ==="
+
+        # Check E-Stop functionality
+        echo "E-Stop service:"
+        ros2 service list 2>/dev/null | grep -i estop || echo "  Not found"
+
+        # Check safety controller
+        echo "Safety controller:"
+        ros2 node list 2>/dev/null | grep -i safety || echo "  Not found"
+
+        # Check diagnostics
+        echo "Diagnostics:"
+        ros2 topic echo /diagnostics --once 2>/dev/null | head -10 || echo "  Not available"
+
+        echo ""
+        echo "Update completed. Verify robot functionality manually."
+      timeout: 30
+
+  - name: report_status
+    description: Report final fleet status
+    action: remote.fleet_status
+    parameters:
+      check_connectivity: true
+
+on_success:
+  message: |
+    Robot fleet update completed successfully!
+    All robots have been updated to the latest packages.
+    Please verify robot functionality before resuming operations.
+
+on_failure:
+  message: |
+    Robot fleet update encountered errors on some robots.
+    Check the error messages above and consider:
+    - Rolling back failed robots manually
+    - Checking network connectivity
+    - Verifying ROS2 installation
+  rollback: false

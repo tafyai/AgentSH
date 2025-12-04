@@ -1,0 +1,336 @@
+# Robot Fleet Docking Workflow
+# Commands robots in a fleet to return to their docking stations
+
+name: robot_fleet_dock
+description: Command robot fleet to return to docking stations
+version: "1.0"
+
+parameters:
+  - name: ros_distro
+    description: ROS2 distribution (humble, iron, jazzy)
+    required: false
+    type: string
+    default: humble
+
+  - name: workspace_path
+    description: ROS2 workspace path on robots
+    required: false
+    type: string
+    default: ~/ros2_ws
+
+  - name: filter_role
+    description: Filter robots by role (optional)
+    required: false
+    type: string
+
+  - name: filter_labels
+    description: Filter robots by labels as JSON (optional)
+    required: false
+    type: object
+
+  - name: strategy
+    description: Docking strategy (all_at_once, serial, staggered)
+    required: false
+    type: string
+    default: staggered
+
+  - name: stagger_delay
+    description: Delay between robot docking commands (seconds)
+    required: false
+    type: integer
+    default: 30
+
+  - name: dock_timeout
+    description: Maximum time to wait for docking (seconds)
+    required: false
+    type: integer
+    default: 300
+
+  - name: force_dock
+    description: Force docking even if battery is sufficient
+    required: false
+    type: boolean
+    default: false
+
+  - name: verify_charging
+    description: Verify robots start charging after docking
+    required: false
+    type: boolean
+    default: true
+
+steps:
+  - name: select_robots
+    description: Select target robots
+    action: remote.list_devices
+    parameters:
+      role: "{{ filter_role }}"
+      labels: "{{ filter_labels }}"
+
+  - name: check_battery_status
+    description: Check battery levels across fleet
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "=== Battery Status ==="
+        # Try common battery topic names
+        for topic in /battery /battery_state /power_supply /robot/battery; do
+          if ros2 topic list 2>/dev/null | grep -q "^${topic}$"; then
+            echo "Battery topic: $topic"
+            ros2 topic echo "$topic" --once 2>/dev/null | grep -E 'percentage|voltage|current|charging' || true
+            break
+          fi
+        done
+
+        # Fallback: check via diagnostics
+        ros2 topic echo /diagnostics --once 2>/dev/null | grep -A5 -i battery || echo "Battery info via diagnostics not available"
+      timeout: 30
+
+  - name: check_current_positions
+    description: Get current robot positions
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "=== Current Position ==="
+        # Get position from odometry
+        ros2 topic echo /odom --once 2>/dev/null | grep -A10 'pose:' | head -15 || echo "Odometry not available"
+
+        # Get AMCL pose if available
+        ros2 topic echo /amcl_pose --once 2>/dev/null | grep -A10 'pose:' | head -15 || echo "AMCL pose not available"
+      timeout: 30
+
+  - name: check_dock_availability
+    description: Verify docking stations are available
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "=== Docking Station Status ==="
+        # Check dock detection topic
+        for topic in /dock /dock_pose /docking_station /ir_dock; do
+          if ros2 topic list 2>/dev/null | grep -q "^${topic}"; then
+            echo "Dock topic found: $topic"
+            ros2 topic echo "$topic" --once 2>/dev/null | head -10 || true
+          fi
+        done
+
+        # Check dock service
+        ros2 service list 2>/dev/null | grep -i dock || echo "No docking services found"
+
+        # Check if dock is visible (for IR-based docking)
+        ros2 topic echo /ir_intensity --once 2>/dev/null | head -5 || echo "IR sensors not available"
+      timeout: 30
+
+  - name: cancel_current_goals
+    description: Cancel any active navigation goals
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "Cancelling active navigation goals..."
+
+        # Cancel Nav2 goals
+        ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose "{}" --cancel 2>/dev/null || true
+
+        # Cancel any movement
+        ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 0.0}}" --once 2>/dev/null || true
+
+        echo "Navigation goals cancelled"
+      timeout: 30
+
+  - name: initiate_docking
+    description: Send docking commands to robots
+    action: orchestrate
+    parameters:
+      strategy: "{{ strategy }}"
+      stagger_delay: "{{ stagger_delay }}"
+      max_concurrent: 5
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "Initiating docking sequence..."
+
+        # Method 1: Use docking action if available
+        if ros2 action list 2>/dev/null | grep -q dock; then
+          echo "Using docking action..."
+          ros2 action send_goal /dock_robot opennav_docking_msgs/action/DockRobot "{dock_id: 'home_dock'}" &
+          DOCK_PID=$!
+
+        # Method 2: Use docking service if available
+        elif ros2 service list 2>/dev/null | grep -q "/dock"; then
+          echo "Using docking service..."
+          ros2 service call /dock std_srvs/srv/Trigger "{}" &
+          DOCK_PID=$!
+
+        # Method 3: Navigate to dock pose
+        else
+          echo "Using navigation to dock pose..."
+          # Default dock position (should be configured per-robot)
+          DOCK_X=${DOCK_POSE_X:-0.0}
+          DOCK_Y=${DOCK_POSE_Y:-0.0}
+          DOCK_YAW=${DOCK_POSE_YAW:-0.0}
+
+          ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+            "{pose: {header: {frame_id: 'map'}, pose: {position: {x: $DOCK_X, y: $DOCK_Y}, orientation: {z: $DOCK_YAW, w: 1.0}}}}" &
+          DOCK_PID=$!
+        fi
+
+        # Wait for docking with timeout
+        TIMEOUT={{ dock_timeout }}
+        ELAPSED=0
+        while [ $ELAPSED -lt $TIMEOUT ]; do
+          if ! kill -0 $DOCK_PID 2>/dev/null; then
+            echo "Docking command completed"
+            break
+          fi
+          sleep 5
+          ELAPSED=$((ELAPSED + 5))
+          echo "Docking in progress... ${ELAPSED}s / ${TIMEOUT}s"
+        done
+
+        if [ $ELAPSED -ge $TIMEOUT ]; then
+          echo "WARNING: Docking timeout reached"
+          kill $DOCK_PID 2>/dev/null || true
+        fi
+      timeout: "{{ dock_timeout + 60 }}"
+      post_check: "echo 'Docking command sent'"
+
+  - name: verify_docked
+    description: Verify robots reached docking stations
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "=== Docking Verification ==="
+
+        # Check docking state
+        for topic in /dock_state /is_docked /docking_status; do
+          if ros2 topic list 2>/dev/null | grep -q "^${topic}$"; then
+            echo "Dock state topic: $topic"
+            ros2 topic echo "$topic" --once 2>/dev/null | head -5
+            break
+          fi
+        done
+
+        # Check if robot is stationary
+        echo ""
+        echo "Velocity check:"
+        ros2 topic echo /odom --once 2>/dev/null | grep -A5 'twist:' | head -10
+
+        # Final position
+        echo ""
+        echo "Final position:"
+        ros2 topic echo /odom --once 2>/dev/null | grep -A5 'position:' | head -10
+      timeout: 30
+
+  - name: verify_charging
+    description: Verify robots are charging
+    condition: "{{ verify_charging }}"
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "=== Charging Verification ==="
+
+        # Wait a moment for charging to start
+        sleep 5
+
+        # Check battery/charging status
+        for topic in /battery /battery_state /power_supply; do
+          if ros2 topic list 2>/dev/null | grep -q "^${topic}$"; then
+            echo "Checking $topic..."
+            CHARGING=$(ros2 topic echo "$topic" --once 2>/dev/null | grep -i charging || echo "unknown")
+            echo "Charging status: $CHARGING"
+
+            CURRENT=$(ros2 topic echo "$topic" --once 2>/dev/null | grep -i current || echo "unknown")
+            echo "Current: $CURRENT"
+            break
+          fi
+        done
+
+        # Check via diagnostics
+        ros2 topic echo /diagnostics --once 2>/dev/null | grep -A3 -i 'charg\|power' || echo "No charging info in diagnostics"
+      timeout: 30
+
+  - name: set_idle_state
+    description: Set robots to idle/charging state
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "Setting robot to idle/charging state..."
+
+        # Publish state change if supported
+        ros2 topic pub /robot/set_state std_msgs/msg/String "{data: 'charging'}" --once 2>/dev/null || true
+
+        # Disable navigation if applicable
+        ros2 service call /lifecycle_manager_navigation/manage_nodes nav2_msgs/srv/ManageLifecycleNodes "{command: 1}" 2>/dev/null || true
+
+        echo "Robot set to idle state"
+      timeout: 30
+
+  - name: generate_docking_report
+    description: Generate fleet docking report
+    action: remote.run_parallel
+    parameters:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "============================================"
+        echo "Docking Report - $(hostname)"
+        echo "============================================"
+        echo "Time: $(date)"
+        echo ""
+
+        # Battery level
+        echo "Battery:"
+        ros2 topic echo /battery --once 2>/dev/null | grep percentage || echo "  N/A"
+
+        # Dock state
+        echo "Docked:"
+        ros2 topic echo /is_docked --once 2>/dev/null || echo "  Status unknown"
+
+        # Position
+        echo "Position:"
+        ros2 topic echo /odom --once 2>/dev/null | grep -A3 'position:' | head -5 || echo "  N/A"
+
+        echo "============================================"
+      timeout: 30
+
+  - name: report_fleet_status
+    description: Report final fleet status
+    action: remote.fleet_status
+    parameters:
+      check_connectivity: true
+
+on_success:
+  message: |
+    Fleet docking completed successfully!
+    All robots have been commanded to return to their docking stations.
+    Verify charging status on individual robots if needed.
+
+on_failure:
+  message: |
+    Fleet docking encountered errors on some robots.
+    Check the error messages above and consider:
+    - Manually guiding robots that failed to dock
+    - Checking docking station availability
+    - Verifying navigation system is functional
+  rollback: false

@@ -1,0 +1,347 @@
+# Robot Hardware Adoption Workflow
+# Detects, configures, and validates new hardware devices for robotics
+
+name: robot_adopt_hardware
+description: Adopt new hardware device for robotics (USB devices, sensors, ROS2 nodes)
+version: "1.0"
+
+parameters:
+  - name: device_type
+    description: Type of device to adopt (usb, serial, i2c, ros2_node)
+    required: false
+    type: string
+    default: usb
+
+  - name: device_path
+    description: Device path (e.g., /dev/ttyUSB0, /dev/video0)
+    required: false
+    type: string
+
+  - name: ros_distro
+    description: ROS2 distribution (humble, iron, jazzy)
+    required: false
+    type: string
+    default: humble
+
+  - name: auto_install_drivers
+    description: Automatically install detected driver packages
+    required: false
+    type: boolean
+    default: false
+
+  - name: run_calibration
+    description: Run calibration after setup
+    required: false
+    type: boolean
+    default: true
+
+  - name: workspace_path
+    description: ROS2 workspace path
+    required: false
+    type: string
+    default: ~/ros2_ws
+
+steps:
+  - id: detect_usb_devices
+    name: Detect connected USB devices
+    condition: "{{ device_type == 'usb' }}"
+    tool: shell.run
+    arguments:
+      command: |
+        echo "=== USB Devices ==="
+        lsusb
+        echo ""
+        echo "=== Recent USB Events ==="
+        dmesg | grep -i usb | tail -20
+        echo ""
+        echo "=== Serial Ports ==="
+        ls -la /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || echo "No USB serial devices found"
+
+  - id: detect_serial_devices
+    name: Detect serial devices
+    condition: "{{ device_type == 'serial' }}"
+    tool: shell.run
+    arguments:
+      command: |
+        echo "=== Serial Devices ==="
+        ls -la /dev/tty* | grep -E '(USB|ACM|S[0-9])'
+        echo ""
+        echo "=== Serial Port Info ==="
+        for port in /dev/ttyUSB* /dev/ttyACM* 2>/dev/null; do
+          if [ -e "$port" ]; then
+            echo "Port: $port"
+            udevadm info --query=all --name="$port" 2>/dev/null | grep -E '(VENDOR|MODEL|SERIAL)'
+          fi
+        done
+
+  - id: detect_i2c_devices
+    name: Detect I2C devices
+    condition: "{{ device_type == 'i2c' }}"
+    tool: shell.run
+    arguments:
+      command: |
+        echo "=== I2C Buses ==="
+        ls /dev/i2c-* 2>/dev/null || echo "No I2C buses found"
+        echo ""
+        echo "=== I2C Devices (requires i2c-tools) ==="
+        for bus in /dev/i2c-*; do
+          if [ -e "$bus" ]; then
+            bus_num=$(echo "$bus" | grep -oE '[0-9]+')
+            echo "Bus $bus_num:"
+            i2cdetect -y "$bus_num" 2>/dev/null || echo "  Cannot scan (try running as root)"
+          fi
+        done
+
+  - id: detect_ros2_nodes
+    name: Detect ROS2 nodes and topics
+    condition: "{{ device_type == 'ros2_node' }}"
+    tool: shell.run
+    arguments:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null || true
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null || true
+        echo "=== ROS2 Nodes ==="
+        ros2 node list 2>/dev/null || echo "ROS2 not running or not available"
+        echo ""
+        echo "=== ROS2 Topics ==="
+        ros2 topic list 2>/dev/null || echo "No topics available"
+        echo ""
+        echo "=== ROS2 Services ==="
+        ros2 service list 2>/dev/null || echo "No services available"
+
+  - id: identify_device_vendor
+    name: Identify device vendor and model
+    tool: shell.run
+    arguments:
+      command: |
+        {% if device_path %}
+        echo "=== Device Information for {{ device_path }} ==="
+        udevadm info --query=all --name="{{ device_path }}" 2>/dev/null || echo "Device not found"
+        {% else %}
+        echo "=== All Device Information ==="
+        for dev in /dev/ttyUSB* /dev/ttyACM* /dev/video*; do
+          if [ -e "$dev" ]; then
+            echo "--- $dev ---"
+            udevadm info --query=property --name="$dev" 2>/dev/null | grep -E '(VENDOR|MODEL|SERIAL|ID_)'
+          fi
+        done
+        {% endif %}
+    depends_on: [detect_usb_devices, detect_serial_devices, detect_i2c_devices, detect_ros2_nodes]
+    continue_on_error: true
+
+  - id: lookup_drivers
+    name: Look up required driver packages
+    tool: shell.run
+    arguments:
+      command: |
+        echo "=== Common Robotics Driver Packages ==="
+        echo ""
+        echo "Lidar packages:"
+        apt-cache search ros-{{ ros_distro }}-.*lidar.* 2>/dev/null | head -10 || echo "  Not found"
+        apt-cache search ros-{{ ros_distro }}-.*laser.* 2>/dev/null | head -10 || echo "  Not found"
+        echo ""
+        echo "Camera packages:"
+        apt-cache search ros-{{ ros_distro }}-.*camera.* 2>/dev/null | head -10 || echo "  Not found"
+        apt-cache search ros-{{ ros_distro }}-usb-cam 2>/dev/null || echo "  Not found"
+        apt-cache search ros-{{ ros_distro }}-realsense.* 2>/dev/null | head -5 || echo "  Not found"
+        echo ""
+        echo "IMU packages:"
+        apt-cache search ros-{{ ros_distro }}-.*imu.* 2>/dev/null | head -10 || echo "  Not found"
+        echo ""
+        echo "Motor controller packages:"
+        apt-cache search ros-{{ ros_distro }}-.*motor.* 2>/dev/null | head -5 || echo "  Not found"
+        apt-cache search ros-{{ ros_distro }}-.*dynamixel.* 2>/dev/null | head -5 || echo "  Not found"
+    depends_on: [identify_device_vendor]
+
+  - id: check_udev_rules
+    name: Check existing udev rules
+    tool: shell.run
+    arguments:
+      command: |
+        echo "=== Robotics udev Rules ==="
+        cat /etc/udev/rules.d/*robot* 2>/dev/null || echo "No robot-specific rules found"
+        cat /etc/udev/rules.d/*lidar* 2>/dev/null || echo "No lidar rules found"
+        cat /etc/udev/rules.d/*camera* 2>/dev/null || echo "No camera rules found"
+        echo ""
+        echo "=== Serial Port Rules ==="
+        grep -r "ttyUSB\|ttyACM" /etc/udev/rules.d/ 2>/dev/null || echo "No serial port rules found"
+    depends_on: [lookup_drivers]
+
+  - id: setup_permissions
+    name: Set up device permissions
+    condition: "{{ device_path != '' }}"
+    tool: shell.run
+    arguments:
+      command: |
+        echo "Setting up permissions for {{ device_path }}"
+        # Add user to dialout group for serial devices
+        if echo "{{ device_path }}" | grep -qE 'tty(USB|ACM)'; then
+          echo "Adding user to dialout group..."
+          sudo usermod -a -G dialout $USER 2>/dev/null || echo "Could not add to dialout group"
+        fi
+        # Add user to video group for cameras
+        if echo "{{ device_path }}" | grep -q 'video'; then
+          echo "Adding user to video group..."
+          sudo usermod -a -G video $USER 2>/dev/null || echo "Could not add to video group"
+        fi
+        # Check current permissions
+        ls -la {{ device_path }}
+    depends_on: [check_udev_rules]
+    continue_on_error: true
+
+  - id: install_drivers
+    name: Install driver packages
+    condition: "{{ auto_install_drivers }}"
+    tool: shell.run
+    arguments:
+      command: |
+        echo "=== Installing ROS2 base packages ==="
+        sudo apt update
+        sudo apt install -y ros-{{ ros_distro }}-ros-base 2>/dev/null || echo "Base already installed"
+
+        echo ""
+        echo "=== Installing common driver packages ==="
+        # Common packages that are often needed
+        sudo apt install -y \
+          ros-{{ ros_distro }}-usb-cam \
+          ros-{{ ros_distro }}-serial-driver \
+          ros-{{ ros_distro }}-diagnostic-updater \
+          2>/dev/null || echo "Some packages not available"
+      timeout: 300
+    depends_on: [setup_permissions]
+    continue_on_error: true
+
+  - id: source_ros_env
+    name: Source ROS2 environment
+    tool: shell.run
+    arguments:
+      command: |
+        echo "Sourcing ROS2 environment..."
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null || echo "Could not source ROS2"
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null || echo "Could not source workspace"
+        echo "ROS_DISTRO: $ROS_DISTRO"
+        echo "AMENT_PREFIX_PATH: $AMENT_PREFIX_PATH"
+    depends_on: [install_drivers]
+
+  - id: verify_device_topics
+    name: Verify device creates expected topics
+    condition: "{{ device_type == 'ros2_node' }}"
+    tool: shell.run
+    arguments:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "=== Verifying ROS2 Topics ==="
+        ros2 topic list
+
+        echo ""
+        echo "=== Topic Info ==="
+        for topic in $(ros2 topic list 2>/dev/null); do
+          echo "--- $topic ---"
+          ros2 topic info "$topic" 2>/dev/null
+        done
+    depends_on: [source_ros_env]
+    continue_on_error: true
+
+  - id: run_calibration
+    name: Run device calibration
+    condition: "{{ run_calibration }}"
+    tool: shell.run
+    arguments:
+      command: |
+        source /opt/ros/{{ ros_distro }}/setup.bash 2>/dev/null
+        source {{ workspace_path }}/install/setup.bash 2>/dev/null
+
+        echo "=== Calibration Status ==="
+        echo "Calibration would typically involve:"
+        echo "  1. Camera: ros2 run camera_calibration cameracalibrator"
+        echo "  2. IMU: ros2 run imu_tools imu_calibration"
+        echo "  3. Lidar: Check transform accuracy"
+        echo ""
+        echo "Note: Run specific calibration tools based on your device type"
+
+        # Check for calibration files
+        if [ -d "{{ workspace_path }}/src" ]; then
+          echo ""
+          echo "=== Existing Calibration Files ==="
+          find {{ workspace_path }}/src -name "*.yaml" -path "*calibration*" 2>/dev/null || echo "No calibration files found"
+        fi
+    depends_on: [verify_device_topics]
+    continue_on_error: true
+
+  - id: generate_launch_file
+    name: Generate sample launch file
+    tool: fs.write
+    arguments:
+      path: "{{ workspace_path }}/src/device_launch.py"
+      content: |
+        #!/usr/bin/env python3
+        """Sample launch file for adopted device.
+
+        Generated by robot_adopt_hardware workflow.
+        Customize based on your specific device.
+        """
+        from launch import LaunchDescription
+        from launch_ros.actions import Node
+
+        def generate_launch_description():
+            return LaunchDescription([
+                # TODO: Add your device node here
+                # Example for USB camera:
+                # Node(
+                #     package='usb_cam',
+                #     executable='usb_cam_node_exe',
+                #     name='usb_cam',
+                #     parameters=[{
+                #         'video_device': '/dev/video0',
+                #         'framerate': 30.0,
+                #     }],
+                # ),
+            ])
+      mode: create
+    depends_on: [run_calibration]
+    continue_on_error: true
+
+  - id: summary
+    name: Generate adoption summary
+    tool: shell.run
+    arguments:
+      command: |
+        echo ""
+        echo "============================================"
+        echo "Hardware Adoption Summary"
+        echo "============================================"
+        echo "Device Type: {{ device_type }}"
+        {% if device_path %}
+        echo "Device Path: {{ device_path }}"
+        {% endif %}
+        echo "ROS Distro: {{ ros_distro }}"
+        echo "Workspace: {{ workspace_path }}"
+        echo ""
+        echo "Next Steps:"
+        echo "  1. Review detected devices and select appropriate driver"
+        echo "  2. Install specific driver package if not already installed"
+        echo "  3. Create udev rules for consistent device naming"
+        echo "  4. Configure device parameters in launch file"
+        echo "  5. Run full calibration if required"
+        echo "  6. Test device output with: ros2 topic echo <topic>"
+        echo ""
+        echo "Sample launch file created at:"
+        echo "  {{ workspace_path }}/src/device_launch.py"
+        echo "============================================"
+    depends_on: [generate_launch_file]
+
+on_success:
+  message: |
+    Hardware adoption workflow completed successfully!
+    Review the output above for device information and next steps.
+
+on_failure:
+  message: |
+    Hardware adoption workflow encountered errors.
+    Check the error messages above and ensure:
+    - Device is properly connected
+    - ROS2 is installed and sourced
+    - You have necessary permissions (try running with sudo)
+  rollback: false
