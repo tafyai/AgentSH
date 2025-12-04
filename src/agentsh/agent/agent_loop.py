@@ -313,7 +313,7 @@ class AgentLoop(LoggerMixin):
         Returns:
             Tool result as string
         """
-        tool = self.tool_registry.get(tool_call.name)
+        tool = self.tool_registry.get_tool(tool_call.name)
 
         if not tool:
             return f"Error: Unknown tool '{tool_call.name}'"
@@ -376,13 +376,13 @@ class AgentLoop(LoggerMixin):
             arguments["context"] = context
 
         # Execute the tool
-        if asyncio.iscoroutinefunction(tool.function):
-            result = await tool.function(**arguments)
+        if asyncio.iscoroutinefunction(tool.handler):
+            result = await tool.handler(**arguments)
         else:
             # Run sync function in thread pool
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
-                None, lambda: tool.function(**arguments)
+                None, lambda: tool.handler(**arguments)
             )
 
         # Normalize result to ToolResult

@@ -21,7 +21,7 @@
 | 7 | Telemetry & Monitoring | Complete | Medium | Phase 4 |
 | 8 | Multi-Device Orchestration | Complete | Medium | Phase 5, 7 |
 | 9 | Robotics Integration | Not Started | Low | Phase 8 |
-| 10 | UX Polish & Hardening | Not Started | Low | All |
+| 10 | UX Polish & Hardening | In Progress | Low | All |
 
 **Legend**:
 - `[ ]` Not started
@@ -983,10 +983,10 @@
 - [x] Update `agent/factory.py`:
   - [x] `create_memory_manager()` factory
   - [x] Memory manager integration with workflow executor
-- [ ] Add shell commands (deferred to UX phase):
-  - [ ] `:remember <note>` - store a fact
-  - [ ] `:recall <query>` - search memory
-  - [ ] `:forget <key>` - delete from memory
+- [x] Shell memory commands (`shell/memory.py`):
+  - [x] `:remember <note>` - store a fact (`MemoryStore.remember()`)
+  - [x] `:recall <query>` - search memory (`MemoryStore.recall()`)
+  - [x] `:forget <id>` - delete from memory (`MemoryStore.forget()`)
 
 ### Phase 6 Deliverables
 
@@ -1407,37 +1407,44 @@
   - [ ] Auto-suggestions during input
   - [ ] Tab completion for tools
   - [ ] Syntax highlighting
-- [ ] Progress indicators:
-  - [ ] Spinner during LLM calls
-  - [ ] Progress bar for long operations
-- [ ] Output formatting:
-  - [ ] Colorized output
-  - [ ] Tables for structured data
-  - [ ] Markdown rendering
-- [ ] Help system:
-  - [ ] `:help` command with topics
+- [x] Progress indicators:
+  - [x] Spinner during LLM calls (`utils/ux.py` - `Spinner` class)
+  - [x] Progress bar for long operations (`utils/ux.py` - `ProgressBar` class)
+- [x] Output formatting:
+  - [x] Colorized output (`utils/ux.py` - `Color` enum, `colorize()`)
+  - [x] Tables for structured data (`utils/ux.py` - `Table`, `TableColumn`)
+  - [x] Markdown rendering (`utils/markdown.py` - `MarkdownRenderer`, `render_markdown()`)
+- [x] Help system (`shell/help.py`):
+  - [x] `:help` command with topics (`HelpSystem`, `HelpTopic`)
+  - [x] Topic-based documentation (categories: getting_started, commands, ai, security, etc.)
+  - [x] Search functionality
   - [ ] `--help` for each command
 
 ### 10.2 Error Handling
 
-- [ ] User-friendly error messages
-- [ ] Suggestions for common errors
-- [ ] Graceful degradation:
-  - [ ] LLM unavailable: use cached responses
-  - [ ] Network issues: retry with backoff
+- [x] User-friendly error messages (`utils/ux.py` - `ErrorFormatter`, `ErrorContext`)
+- [x] Suggestions for common errors (`utils/ux.py` - `get_error_suggestion()`, `ERROR_SUGGESTIONS`)
+- [x] Graceful degradation (`agent/resilient.py`):
+  - [x] LLM unavailable: use cached responses (`ResilientLLMClient`)
+  - [x] Network issues: retry with backoff (`RetryConfig`, exponential backoff)
+  - [x] Circuit breaker pattern (`CircuitBreakerConfig`, `CircuitState`)
   - [ ] Resource exhaustion: cleanup
 
 ### 10.3 Performance Optimization
 
-- [ ] LLM caching:
-  - [ ] Cache common queries
+- [x] LLM caching (`agent/cache.py`):
+  - [x] Cache common queries (`LLMCache`, `SQLiteLLMCache`)
+  - [x] Cache key builder (`CacheKeyBuilder`)
+  - [x] TTL-based expiration
+  - [x] LRU eviction
+  - [x] Hit rate tracking
   - [ ] Semantic cache (similar queries)
-- [ ] Lazy loading:
-  - [ ] Load plugins on demand
-  - [ ] Defer heavy initialization
-- [ ] Connection pooling:
-  - [ ] Reuse SSH connections
-  - [ ] HTTP keep-alive for LLM
+- [x] Lazy loading (`plugins/lazy.py`):
+  - [x] Load plugins on demand (`LazyPlugin`, `LazyPluginRegistry`)
+  - [x] Defer heavy initialization (`PluginState`, `load_plugins_lazy()`)
+- [x] Connection pooling:
+  - [x] Reuse SSH connections (Phase 8 - `orchestrator/ssh.py` - `SSHConnectionPool`)
+  - [x] HTTP keep-alive for LLM (`agent/http_client.py` - `HTTPClientManager`)
 
 ### 10.4 Security Hardening
 
@@ -1445,13 +1452,18 @@
   - [ ] Prompt injection attempts
   - [ ] Command injection attempts
   - [ ] Privilege escalation attempts
-- [ ] Secret management:
-  - [ ] Don't log secrets
-  - [ ] Encrypt at rest
-  - [ ] Secure credential storage
-- [ ] Input sanitization:
-  - [ ] Validate all user input
-  - [ ] Escape special characters
+- [x] Secret management (`utils/validators.py`, `utils/crypto.py`):
+  - [x] Don't log secrets (`redact_secrets()`)
+  - [x] Secret detection (`InputSanitizer.check_for_secrets()`)
+  - [x] Encrypt at rest (`Encryptor`, `EncryptedData`)
+  - [x] Secure credential storage (`SecureStore`)
+- [x] Input sanitization (`utils/validators.py`):
+  - [x] Validate all user input (`InputSanitizer`, `validate_and_sanitize()`)
+  - [x] Escape special characters (`sanitize_shell_arg()`)
+  - [x] Path validation (`PathValidator`)
+  - [x] Command validation (`CommandValidator`)
+  - [x] SQL injection prevention (`sanitize_sql_value()`)
+  - [x] URL validation (`sanitize_url()`)
 
 ### 10.5 Testing Completion
 
@@ -1514,13 +1526,16 @@
 - [ ] `history.py` - Command history
 
 ### Agent Package (`src/agentsh/agent/`)
-- [ ] `__init__.py`
-- [ ] `llm_client.py` - LLM abstraction
-- [ ] `providers/anthropic.py`
-- [ ] `providers/openai.py`
+- [x] `__init__.py`
+- [x] `llm_client.py` - LLM abstraction
+- [x] `providers/anthropic.py`
+- [x] `providers/openai.py`
 - [ ] `providers/ollama.py`
-- [ ] `prompts.py` - System prompts
-- [ ] `agent_loop.py` - ReAct loop
+- [x] `prompts.py` - System prompts
+- [x] `agent_loop.py` - ReAct loop
+- [x] `cache.py` - LLM response caching
+- [x] `resilient.py` - Fault-tolerant LLM client
+- [x] `factory.py` - Agent factory
 - [ ] `executor.py` - Tool execution
 - [ ] `tool_schema.py` - Schema generation
 
@@ -1579,9 +1594,10 @@
 - [x] `mcp_server.py` - MCP server
 
 ### Plugins Package (`src/agentsh/plugins/`)
-- [ ] `__init__.py`
-- [ ] `base.py` - Toolset ABC
-- [ ] `loader.py` - Plugin loader
+- [x] `__init__.py`
+- [x] `base.py` - Toolset ABC
+- [x] `loader.py` - Plugin loader
+- [x] `lazy.py` - Lazy loading support
 - [ ] `builtin/shell.py` - Shell toolset
 - [ ] `builtin/filesystem.py` - FS toolset
 - [ ] `builtin/process.py` - Process toolset
@@ -1597,31 +1613,55 @@
 - [ ] `defaults.py` - Default values
 
 ### Utils Package (`src/agentsh/utils/`)
-- [ ] `__init__.py`
-- [ ] `env.py` - Environment helpers
-- [ ] `crypto.py` - Encryption
-- [ ] `validators.py` - Input validation
-- [ ] `async_utils.py` - Async helpers
+- [x] `__init__.py`
+- [x] `env.py` - Environment helpers
+- [x] `crypto.py` - Encryption and secure storage
+- [x] `validators.py` - Input validation
+- [x] `ux.py` - UX utilities (spinners, tables, colors)
+- [x] `async_utils.py` - Async helpers (retry, rate limiting, timeouts)
+- [x] `markdown.py` - Markdown terminal rendering
 
 ---
 
 ## Appendix B: Test Checklist
 
 ### Unit Tests (`tests/unit/`)
-- [ ] `test_input_classifier.py`
-- [ ] `test_history.py`
-- [ ] `test_risk_classifier.py`
-- [ ] `test_rbac.py`
-- [ ] `test_approval.py`
+- [x] `test_input_classifier.py`
+- [x] `test_history.py`
+- [x] `test_security.py` - Risk classifier, RBAC, approval
+- [x] `test_tool_registry.py`
+- [x] `test_tool_runner.py`
+- [x] `test_toolsets.py`
+- [x] `test_workflow_states.py`
+- [x] `test_workflow_edges.py`
+- [x] `test_workflow_nodes.py`
+- [x] `test_predefined_workflows.py`
+- [x] `test_memory_schemas.py`
+- [x] `test_memory_session.py`
+- [x] `test_memory_store.py`
+- [x] `test_memory_retrieval.py`
+- [x] `test_memory_manager.py`
+- [x] `test_telemetry_events.py`
+- [x] `test_telemetry_metrics.py`
+- [x] `test_telemetry_exporters.py`
+- [x] `test_telemetry_health.py`
+- [x] `test_device_inventory.py`
+- [x] `test_ssh_executor.py`
+- [x] `test_orchestrator_coordinator.py`
+- [x] `test_mcp_server.py`
+- [x] `test_ux.py` - UX utilities tests
+- [x] `test_validators.py` - Input validation tests
+- [x] `test_llm_cache.py` - LLM caching tests
+- [x] `test_resilient.py` - Resilient LLM client tests
+- [x] `test_async_utils.py` - Async utilities tests
+- [x] `test_help.py` - Help system tests
+- [x] `test_markdown.py` - Markdown rendering tests
+- [x] `test_lazy_plugins.py` - Lazy plugin loading tests
+- [x] `test_crypto.py` - Cryptographic utilities tests
+- [x] `test_http_client.py` - HTTP client management tests
+- [x] `test_memory.py` - Shell memory tests
 - [ ] `test_llm_client.py`
 - [ ] `test_agent_loop.py`
-- [ ] `test_tool_registry.py`
-- [ ] `test_tool_runner.py`
-- [ ] `test_workflow_nodes.py`
-- [ ] `test_session_memory.py`
-- [ ] `test_persistent_store.py`
-- [ ] `test_telemetry.py`
-- [ ] `test_device_inventory.py`
 - [ ] `test_robot_safety.py`
 
 ### Integration Tests (`tests/integration/`)

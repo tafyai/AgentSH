@@ -69,8 +69,10 @@ class TestShellWrapper:
 
     def test_process_special_command_help(self, wrapper: ShellWrapper) -> None:
         """Test processing :help command."""
-        with patch.object(wrapper, "_show_help") as mock_help:
-            wrapper._process_input(":help")
+        with patch("agentsh.shell.wrapper.show_help") as mock_help:
+            mock_help.return_value = "Help content"
+            with patch("builtins.print"):
+                wrapper._process_input(":help")
             mock_help.assert_called_once()
 
     def test_process_special_command_config(self, wrapper: ShellWrapper) -> None:
@@ -220,12 +222,11 @@ class TestShellWrapperHelpers:
         assert any("AgentSH" in str(call) for call in calls)
 
     def test_show_help(self, wrapper: ShellWrapper) -> None:
-        """Test help display."""
-        with patch("builtins.print") as mock_print:
-            wrapper._show_help()
+        """Test help display via show_help function."""
+        from agentsh.shell.help import show_help
 
-        calls = [str(call) for call in mock_print.call_args_list]
-        assert any("Commands" in str(call) for call in calls)
+        output = show_help(use_color=False)
+        assert "AgentSH Help" in output
 
     def test_show_config(self, wrapper: ShellWrapper) -> None:
         """Test config display."""

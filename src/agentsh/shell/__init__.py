@@ -1,6 +1,22 @@
 """Shell wrapper and user I/O handling."""
 
+from agentsh.shell.help import (
+    HelpCategory,
+    HelpSystem,
+    HelpTopic,
+    get_help_system,
+    show_help,
+)
 from agentsh.shell.history import HistoryEntry, HistoryManager, ReadlineHistory
+from agentsh.shell.memory import (
+    MemoryEntry,
+    MemoryStore,
+    format_memory_list,
+    forget,
+    get_memory_store,
+    recall,
+    remember,
+)
 from agentsh.shell.input_classifier import (
     ClassifiedInput,
     InputClassifier,
@@ -41,4 +57,18 @@ __all__ = [
     "HistoryEntry",
     "HistoryManager",
     "ReadlineHistory",
+    # Memory
+    "MemoryEntry",
+    "MemoryStore",
+    "format_memory_list",
+    "forget",
+    "get_memory_store",
+    "recall",
+    "remember",
+    # Help
+    "HelpCategory",
+    "HelpSystem",
+    "HelpTopic",
+    "get_help_system",
+    "show_help",
 ]

@@ -7,7 +7,12 @@ import termios
 import tty
 from typing import TYPE_CHECKING, Callable, Optional
 
+from agentsh.shell.help import show_help
 from agentsh.shell.history import HistoryManager, ReadlineHistory
+from agentsh.shell.memory import (
+    format_memory_list,
+    get_memory_store,
+)
 from agentsh.shell.input_classifier import (
     ClassifiedInput,
     InputClassifier,
@@ -177,7 +182,9 @@ class ShellWrapper(LoggerMixin):
         command, args = parse_special_command(classified.content)
 
         if command in ("help", "h"):
-            self._show_help()
+            # Show help - optionally for a specific topic
+            topic = args[0] if args else None
+            print(show_help(topic))
         elif command == "config":
             self._show_config()
         elif command == "history":
@@ -188,12 +195,68 @@ class ShellWrapper(LoggerMixin):
             self._reset_context()
         elif command == "status":
             self._show_status()
+        elif command == "remember":
+            self._handle_remember(args)
+        elif command == "recall":
+            self._handle_recall(args)
+        elif command == "forget":
+            self._handle_forget(args)
         elif command in ("quit", "exit", "q"):
             self._running = False
             print("Goodbye!")
         else:
             print(f"Unknown command: {command}")
             print("Type :help for available commands")
+
+    def _handle_remember(self, args: list[str]) -> None:
+        """Handle :remember command.
+
+        Args:
+            args: Command arguments (the note to remember)
+        """
+        if not args:
+            print("Usage: :remember <note>")
+            print("Example: :remember Deploy to production on Friday")
+            return
+
+        content = " ".join(args)
+        store = get_memory_store()
+        entry_id = store.remember(content)
+        print(f"Remembered! (ID: {entry_id})")
+
+    def _handle_recall(self, args: list[str]) -> None:
+        """Handle :recall command.
+
+        Args:
+            args: Search query (optional)
+        """
+        query = " ".join(args) if args else None
+        store = get_memory_store()
+        entries = store.recall(query, limit=10)
+        print(format_memory_list(entries))
+
+    def _handle_forget(self, args: list[str]) -> None:
+        """Handle :forget command.
+
+        Args:
+            args: Memory ID to forget
+        """
+        if not args:
+            print("Usage: :forget <id>")
+            print("Use :recall to see memory IDs")
+            return
+
+        try:
+            entry_id = int(args[0])
+        except ValueError:
+            print(f"Invalid ID: {args[0]}")
+            return
+
+        store = get_memory_store()
+        if store.forget(entry_id):
+            print(f"Forgot memory {entry_id}")
+        else:
+            print(f"Memory {entry_id} not found")
 
     def _handle_ai_request(self, classified: ClassifiedInput) -> None:
         """Handle AI request.
@@ -261,24 +324,6 @@ class ShellWrapper(LoggerMixin):
         print("    :quit               Exit AgentSH")
         print()
 
-    def _show_help(self) -> None:
-        """Show help information."""
-        print("\nAgentSH Commands")
-        print("=" * 40)
-        print()
-        print("Input Prefixes:")
-        print(f"  {self.config.shell.ai_prefix}<text>  Force AI request")
-        print(f"  {self.config.shell.shell_prefix}<cmd>    Force shell command")
-        print()
-        print("Special Commands:")
-        for cmd, desc in SPECIAL_COMMANDS.items():
-            print(f"  :{cmd:<12} {desc}")
-        print()
-        print("Tips:")
-        print("  - Regular shell commands work normally")
-        print("  - Natural language is sent to AI")
-        print("  - Use ! prefix to force shell execution")
-        print()
 
     def _show_config(self) -> None:
         """Show current configuration."""

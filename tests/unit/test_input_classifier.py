@@ -247,7 +247,11 @@ class TestSpecialCommands:
 
     def test_all_commands_documented(self) -> None:
         """Test that all expected commands are in registry."""
-        expected = {"help", "h", "config", "history", "clear", "reset", "status", "quit", "exit", "q"}
+        expected = {
+            "help", "h", "config", "history", "clear", "reset", "status",
+            "remember", "recall", "forget",  # Memory commands
+            "quit", "exit", "q",
+        }
         assert set(SPECIAL_COMMANDS.keys()) == expected
 
     def test_commands_have_descriptions(self) -> None:
