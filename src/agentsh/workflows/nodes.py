@@ -450,15 +450,28 @@ class MemoryNode:
     This node:
     1. Retrieves relevant context from memory
     2. Stores completed turns in memory
+    3. Updates context with relevant memories
     """
 
-    def __init__(self, memory_manager: Optional[Any] = None) -> None:
+    def __init__(
+        self,
+        memory_manager: Optional[Any] = None,
+        store_turns: bool = True,
+        retrieve_context: bool = True,
+        max_context_tokens: int = 2000,
+    ) -> None:
         """Initialize memory node.
 
         Args:
-            memory_manager: Memory manager instance
+            memory_manager: Memory manager instance (MemoryManager)
+            store_turns: Whether to store conversation turns
+            retrieve_context: Whether to retrieve relevant context
+            max_context_tokens: Max tokens for retrieved context
         """
         self.memory_manager = memory_manager
+        self.store_turns = store_turns
+        self.retrieve_context = retrieve_context
+        self.max_context_tokens = max_context_tokens
 
     async def __call__(self, state: AgentState) -> dict[str, Any]:
         """Execute the memory node.
@@ -467,18 +480,125 @@ class MemoryNode:
             state: Current workflow state
 
         Returns:
-            State updates
+            State updates with context enrichment
         """
         if not self.memory_manager:
             return {}
 
-        # For now, just log - full implementation in Phase 6
         logger.debug(
             "Memory node executing",
             step=state.get("step_count", 0),
         )
 
-        return {}
+        updates: dict[str, Any] = {}
+
+        # Store the current turn if we have messages
+        if self.store_turns and state.get("messages"):
+            await self._store_turn(state)
+
+        # Retrieve relevant context for the goal
+        if self.retrieve_context and state.get("goal"):
+            context_updates = await self._retrieve_context(state)
+            if context_updates:
+                updates["context"] = {
+                    **state.get("context", {}),
+                    **context_updates,
+                }
+
+        return updates
+
+    async def _store_turn(self, state: AgentState) -> None:
+        """Store the current conversation turn.
+
+        Args:
+            state: Current workflow state
+        """
+        messages = state.get("messages", [])
+        if len(messages) < 2:
+            return
+
+        # Find the last user and assistant messages
+        user_input = ""
+        agent_response = ""
+
+        for msg in reversed(messages):
+            if msg.role == "assistant" and not agent_response:
+                agent_response = msg.content or ""
+            elif msg.role == "user" and not user_input:
+                user_input = msg.content or ""
+            if user_input and agent_response:
+                break
+
+        if not user_input or not agent_response:
+            return
+
+        # Get tools used
+        tools_used = [
+            record.name for record in state.get("tools_used", [])
+        ]
+
+        # Store the turn
+        try:
+            self.memory_manager.add_turn(
+                user_input=user_input,
+                agent_response=agent_response,
+                tools_used=tools_used,
+                success=not state.get("error"),
+                metadata={
+                    "step_count": state.get("step_count", 0),
+                    "goal": state.get("goal", ""),
+                },
+            )
+        except Exception as e:
+            logger.warning("Failed to store turn in memory", error=str(e))
+
+    async def _retrieve_context(self, state: AgentState) -> dict[str, Any]:
+        """Retrieve relevant context from memory.
+
+        Args:
+            state: Current workflow state
+
+        Returns:
+            Context updates dict
+        """
+        goal = state.get("goal", "")
+        if not goal:
+            return {}
+
+        try:
+            # Get relevant memories
+            results = self.memory_manager.recall(
+                query=goal,
+                limit=5,
+            )
+
+            if not results:
+                return {}
+
+            # Build context string
+            relevant_memories = []
+            for result in results:
+                memory_info = {
+                    "title": result.record.title,
+                    "type": result.record.type.value,
+                    "score": result.score,
+                    "preview": result.record.content[:200],
+                }
+                relevant_memories.append(memory_info)
+
+            return {
+                "relevant_memories": relevant_memories,
+                "memory_context": self.memory_manager.get_context(
+                    query=goal,
+                    include_session=True,
+                    include_relevant=True,
+                    max_tokens=self.max_context_tokens,
+                ),
+            }
+
+        except Exception as e:
+            logger.warning("Failed to retrieve memory context", error=str(e))
+            return {}
 
 
 class ErrorRecoveryNode:

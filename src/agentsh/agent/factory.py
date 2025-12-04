@@ -8,6 +8,7 @@ from agentsh.agent.llm_client import LLMClient
 from agentsh.agent.providers.anthropic import AnthropicClient
 from agentsh.agent.providers.openai import OpenAIClient
 from agentsh.config.schemas import AgentSHConfig, LLMProvider
+from agentsh.memory.manager import MemoryManager
 from agentsh.security.controller import SecurityController
 from agentsh.telemetry.logger import get_logger
 from agentsh.tools.registry import ToolRegistry
@@ -140,10 +141,30 @@ async def create_async_ai_handler(config: AgentSHConfig) -> Callable:
     return handler
 
 
+def create_memory_manager(
+    config: AgentSHConfig,
+    db_path: Optional[str] = None,
+) -> MemoryManager:
+    """Create a memory manager instance.
+
+    Args:
+        config: AgentSH configuration
+        db_path: Optional custom database path
+
+    Returns:
+        Configured MemoryManager
+    """
+    # Use config memory path or default
+    memory_db_path = db_path or "~/.agentsh/memory.db"
+
+    return MemoryManager(db_path=memory_db_path)
+
+
 def create_workflow_executor(
     config: AgentSHConfig,
     tool_registry: Optional[ToolRegistry] = None,
     security_controller: Optional[SecurityController] = None,
+    memory_manager: Optional[MemoryManager] = None,
 ) -> WorkflowExecutor:
     """Create a workflow executor with LangGraph support.
 
@@ -151,6 +172,7 @@ def create_workflow_executor(
         config: AgentSH configuration
         tool_registry: Optional pre-configured tool registry
         security_controller: Optional security controller
+        memory_manager: Optional memory manager for context
 
     Returns:
         Configured WorkflowExecutor
@@ -164,6 +186,7 @@ def create_workflow_executor(
         llm_client=llm_client,
         tool_registry=tool_registry,
         security_controller=security_controller,
+        memory_manager=memory_manager,
         max_steps=10,
         tool_timeout=30.0,
     )
@@ -173,6 +196,7 @@ def create_workflow_handler(
     config: AgentSHConfig,
     tool_registry: Optional[ToolRegistry] = None,
     security_controller: Optional[SecurityController] = None,
+    memory_manager: Optional[MemoryManager] = None,
 ) -> Callable[[str], str]:
     """Create a workflow-based AI handler for the shell.
 
@@ -182,11 +206,14 @@ def create_workflow_handler(
         config: AgentSH configuration
         tool_registry: Optional tool registry
         security_controller: Optional security controller
+        memory_manager: Optional memory manager
 
     Returns:
         Handler function that takes request and returns response
     """
-    executor = create_workflow_executor(config, tool_registry, security_controller)
+    executor = create_workflow_executor(
+        config, tool_registry, security_controller, memory_manager
+    )
 
     def handler(request: str) -> str:
         """Handle an AI request using workflows."""
@@ -216,6 +243,7 @@ async def create_async_workflow_handler(
     config: AgentSHConfig,
     tool_registry: Optional[ToolRegistry] = None,
     security_controller: Optional[SecurityController] = None,
+    memory_manager: Optional[MemoryManager] = None,
 ) -> Callable[[str], Any]:
     """Create an async workflow handler.
 
@@ -223,11 +251,14 @@ async def create_async_workflow_handler(
         config: AgentSH configuration
         tool_registry: Optional tool registry
         security_controller: Optional security controller
+        memory_manager: Optional memory manager
 
     Returns:
         Async handler function
     """
-    executor = create_workflow_executor(config, tool_registry, security_controller)
+    executor = create_workflow_executor(
+        config, tool_registry, security_controller, memory_manager
+    )
 
     async def handler(request: str) -> str:
         """Handle an AI request asynchronously using workflows."""
