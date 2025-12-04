@@ -1,5 +1,12 @@
 """Shell wrapper and user I/O handling."""
 
+from agentsh.shell.completer import (
+    CompletionResult,
+    CompletionType,
+    ShellCompleter,
+    get_completer,
+    setup_completion,
+)
 from agentsh.shell.help import (
     HelpCategory,
     HelpSystem,
@@ -40,6 +47,12 @@ __all__ = [
     "ShellWrapper",
     # PTY Manager
     "PTYManager",
+    # Completer
+    "CompletionResult",
+    "CompletionType",
+    "ShellCompleter",
+    "get_completer",
+    "setup_completion",
     # Input Classifier
     "ClassifiedInput",
     "InputClassifier",

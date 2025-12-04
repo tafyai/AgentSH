@@ -69,6 +69,18 @@ from agentsh.utils.validators import (
     redact_secrets,
     validate_and_sanitize,
 )
+from agentsh.utils.resource_manager import (
+    CleanupHandler,
+    ResourceLimits,
+    ResourceManager,
+    ResourceStatus,
+    ResourceType,
+    ResourceUsage,
+    cleanup_on_exhaustion,
+    get_resource_manager,
+    register_cleanup,
+    resource_guard,
+)
 
 __all__ = [
     # Async utilities
@@ -137,4 +149,15 @@ __all__ = [
     "ValidationResult",
     "redact_secrets",
     "validate_and_sanitize",
+    # Resource Management
+    "CleanupHandler",
+    "ResourceLimits",
+    "ResourceManager",
+    "ResourceStatus",
+    "ResourceType",
+    "ResourceUsage",
+    "cleanup_on_exhaustion",
+    "get_resource_manager",
+    "register_cleanup",
+    "resource_guard",
 ]
