@@ -138,15 +138,147 @@ def cmd_status() -> int:
 
 def cmd_mcp_server(config_path: Optional[Path]) -> int:
     """Run as MCP server."""
-    print("MCP Server mode - Coming in Phase 8")
-    print("This will expose AgentSH tools via the Model Context Protocol.")
+    import asyncio
+
+    from agentsh.orchestrator.mcp_server import MCPServer, MCPServerConfig
+
+    config = load_config(config_path) if config_path else load_config()
+    setup_logging(config.log_level, config.telemetry.log_file)
+
+    mcp_config = MCPServerConfig(
+        name="agentsh",
+        version=__version__,
+    )
+
+    server = MCPServer(mcp_config)
+    asyncio.run(server.run_stdio())
     return 0
 
 
 def cmd_devices(args: argparse.Namespace) -> int:
     """Device management commands."""
-    print("Device management - Coming in Phase 8")
-    return 0
+    from pathlib import Path
+
+    from agentsh.orchestrator.devices import (
+        Device,
+        DeviceInventory,
+        DeviceStatus,
+        DeviceType,
+        create_device,
+    )
+
+    # Get inventory path from config or default
+    inventory_path = Path("~/.agentsh/devices.yaml").expanduser()
+    inventory = DeviceInventory(inventory_path)
+
+    if args.devices_command == "list":
+        devices = inventory.list()
+        if not devices:
+            print("No devices in inventory")
+            print(f"\nTo add a device: agentsh devices add <hostname>")
+            return 0
+
+        print(f"Devices ({len(devices)} total):")
+        print("-" * 60)
+        for device in devices:
+            status_icon = {
+                DeviceStatus.ONLINE: "●",
+                DeviceStatus.OFFLINE: "○",
+                DeviceStatus.DEGRADED: "◐",
+                DeviceStatus.MAINTENANCE: "◑",
+                DeviceStatus.UNKNOWN: "?",
+            }.get(device.status, "?")
+
+            print(f"  {status_icon} {device.id}")
+            print(f"    Hostname: {device.hostname}")
+            if device.ip:
+                print(f"    IP: {device.ip}")
+            print(f"    Type: {device.device_type.value}")
+            if device.role:
+                print(f"    Role: {device.role}")
+            if device.labels:
+                labels_str = ", ".join(f"{k}={v}" for k, v in device.labels.items())
+                print(f"    Labels: {labels_str}")
+            print()
+        return 0
+
+    elif args.devices_command == "add":
+        hostname = args.host
+
+        # Check if already exists
+        if inventory.get_by_hostname(hostname):
+            print(f"Device with hostname '{hostname}' already exists")
+            return 1
+
+        # Parse optional arguments
+        ip = getattr(args, "ip", None)
+        device_type = getattr(args, "type", "server")
+        role = getattr(args, "role", None)
+        port = getattr(args, "port", 22)
+
+        device = create_device(
+            hostname=hostname,
+            ip=ip,
+            device_type=DeviceType(device_type),
+            role=role,
+            port=port,
+        )
+
+        inventory.add(device)
+        inventory.save()
+
+        print(f"Added device: {device.id}")
+        print(f"  Hostname: {device.hostname}")
+        print(f"  Type: {device.device_type.value}")
+        return 0
+
+    elif args.devices_command == "remove":
+        device_id = args.device_id
+
+        if inventory.remove(device_id):
+            inventory.save()
+            print(f"Removed device: {device_id}")
+            return 0
+        else:
+            print(f"Device not found: {device_id}")
+            return 1
+
+    elif args.devices_command == "status":
+        device_id = getattr(args, "device_id", None)
+
+        if device_id:
+            device = inventory.get(device_id)
+            if not device:
+                print(f"Device not found: {device_id}")
+                return 1
+
+            from agentsh.orchestrator.ssh import SSHCredentials, SSHExecutor
+
+            executor = SSHExecutor(SSHCredentials.from_env())
+            result = executor.execute(device, "echo ok", timeout=10)
+
+            if result.success:
+                inventory.update_status(device_id, DeviceStatus.ONLINE)
+                print(f"Device {device_id}: ONLINE ({result.duration_ms:.1f}ms)")
+            else:
+                inventory.update_status(device_id, DeviceStatus.OFFLINE)
+                print(f"Device {device_id}: OFFLINE")
+                if result.error:
+                    print(f"  Error: {result.error}")
+            inventory.save()
+        else:
+            # Check all devices
+            counts = inventory.count_by_status()
+            total = inventory.count()
+            print(f"Fleet Status ({total} devices):")
+            for status, count in sorted(counts.items(), key=lambda x: x[0].value):
+                print(f"  {status.value}: {count}")
+
+        return 0
+
+    else:
+        print("Unknown devices command. Use: list, add, remove, status")
+        return 1
 
 
 def cmd_interactive_shell(config_path: Optional[Path], log_level: Optional[str]) -> int:

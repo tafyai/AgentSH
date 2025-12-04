@@ -1,0 +1,194 @@
+# Fleet Healthcheck Workflow
+# Performs comprehensive health checks across a fleet of devices
+
+name: fleet_healthcheck
+description: Check health and collect telemetry from all devices
+version: "1.0"
+
+parameters:
+  - name: filter_role
+    description: Filter devices by role (optional)
+    required: false
+    type: string
+
+  - name: filter_labels
+    description: Filter devices by labels as JSON (optional)
+    required: false
+    type: object
+
+  - name: include_detailed
+    description: Include detailed system information
+    required: false
+    type: boolean
+    default: true
+
+  - name: include_disk
+    description: Check disk usage
+    required: false
+    type: boolean
+    default: true
+
+  - name: include_memory
+    description: Check memory usage
+    required: false
+    type: boolean
+    default: true
+
+  - name: include_processes
+    description: Check running processes
+    required: false
+    type: boolean
+    default: false
+
+  - name: disk_threshold
+    description: Disk usage percentage threshold for alerts
+    required: false
+    type: integer
+    default: 80
+
+  - name: memory_threshold
+    description: Memory usage percentage threshold for alerts
+    required: false
+    type: integer
+    default: 90
+
+  - name: max_concurrent
+    description: Maximum concurrent checks
+    required: false
+    type: integer
+    default: 20
+
+steps:
+  - name: select_devices
+    description: Select target devices
+    action: remote.list_devices
+    parameters:
+      role: "{{ filter_role }}"
+      labels: "{{ filter_labels }}"
+
+  - name: connectivity_check
+    description: Check device connectivity
+    action: remote.fleet_status
+    parameters:
+      check_connectivity: true
+
+  - name: basic_health
+    description: Basic health check (uptime, load)
+    action: remote.run_parallel
+    parameters:
+      command: |
+        echo "=== System Info ==="
+        hostname
+        uptime
+        echo ""
+        echo "=== Load Average ==="
+        cat /proc/loadavg
+      timeout: 30
+      max_concurrent: "{{ max_concurrent }}"
+
+  - name: disk_check
+    description: Check disk usage
+    condition: "{{ include_disk }}"
+    action: remote.run_parallel
+    parameters:
+      command: |
+        echo "=== Disk Usage ==="
+        df -h | grep -E '^/dev/'
+        echo ""
+        echo "=== High Usage Partitions (>${{ disk_threshold }}%) ==="
+        df -h | awk 'NR>1 {gsub(/%/,"",$5); if($5>${{ disk_threshold }}) print $0}'
+      timeout: 30
+      max_concurrent: "{{ max_concurrent }}"
+
+  - name: memory_check
+    description: Check memory usage
+    condition: "{{ include_memory }}"
+    action: remote.run_parallel
+    parameters:
+      command: |
+        echo "=== Memory Usage ==="
+        free -h
+        echo ""
+        MEM_USED=$(free | awk '/^Mem:/{printf "%.0f", $3/$2 * 100}')
+        echo "Memory Used: ${MEM_USED}%"
+        if [ "$MEM_USED" -gt "{{ memory_threshold }}" ]; then
+          echo "WARNING: Memory usage exceeds threshold!"
+        fi
+      timeout: 30
+      max_concurrent: "{{ max_concurrent }}"
+
+  - name: detailed_info
+    description: Collect detailed system information
+    condition: "{{ include_detailed }}"
+    action: remote.run_parallel
+    parameters:
+      command: |
+        echo "=== OS Info ==="
+        cat /etc/os-release 2>/dev/null | head -3 || echo "Unknown"
+        echo ""
+        echo "=== Kernel ==="
+        uname -r
+        echo ""
+        echo "=== Network ==="
+        ip addr show 2>/dev/null | grep -E 'inet ' | awk '{print $2}' || hostname -I
+      timeout: 60
+      max_concurrent: "{{ max_concurrent }}"
+
+  - name: process_check
+    description: Check running processes
+    condition: "{{ include_processes }}"
+    action: remote.run_parallel
+    parameters:
+      command: |
+        echo "=== Top Processes by CPU ==="
+        ps aux --sort=-%cpu | head -6
+        echo ""
+        echo "=== Top Processes by Memory ==="
+        ps aux --sort=-%mem | head -6
+      timeout: 30
+      max_concurrent: "{{ max_concurrent }}"
+
+  - name: service_check
+    description: Check critical services
+    action: remote.run_parallel
+    parameters:
+      command: |
+        echo "=== Service Status ==="
+        for service in sshd cron; do
+          if systemctl is-active --quiet $service 2>/dev/null; then
+            echo "$service: running"
+          elif service $service status >/dev/null 2>&1; then
+            echo "$service: running"
+          else
+            echo "$service: not running or not found"
+          fi
+        done
+      timeout: 30
+      max_concurrent: "{{ max_concurrent }}"
+
+  - name: report_summary
+    description: Generate health summary
+    action: summarize
+    parameters:
+      include_failures: true
+      include_warnings: true
+
+on_failure:
+  - name: alert_offline
+    action: log
+    parameters:
+      level: warning
+      message: "Some devices failed health checks"
+
+alerts:
+  - condition: "disk_usage > {{ disk_threshold }}"
+    severity: warning
+    message: "Disk usage exceeds {{ disk_threshold }}%"
+
+  - condition: "memory_usage > {{ memory_threshold }}"
+    severity: warning
+    message: "Memory usage exceeds {{ memory_threshold }}%"
+
+  - condition: "device_offline"
+    severity: critical
+    message: "Device is offline"

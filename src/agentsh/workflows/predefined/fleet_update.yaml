@@ -1,0 +1,123 @@
+# Fleet Update Workflow
+# Updates packages across a fleet of devices
+
+name: fleet_update
+description: Update system packages across a fleet of devices
+version: "1.0"
+
+parameters:
+  - name: filter_role
+    description: Filter devices by role (optional)
+    required: false
+    type: string
+
+  - name: filter_labels
+    description: Filter devices by labels as JSON (optional)
+    required: false
+    type: object
+
+  - name: package_manager
+    description: Package manager to use (apt, yum, dnf)
+    required: false
+    type: string
+    default: apt
+
+  - name: update_only
+    description: Only update package lists, don't upgrade
+    required: false
+    type: boolean
+    default: false
+
+  - name: strategy
+    description: Rollout strategy (all_at_once, serial, canary, rolling)
+    required: false
+    type: string
+    default: canary
+
+  - name: canary_count
+    description: Number of canary devices
+    required: false
+    type: integer
+    default: 1
+
+  - name: max_concurrent
+    description: Maximum concurrent updates
+    required: false
+    type: integer
+    default: 5
+
+steps:
+  - name: select_devices
+    description: Select target devices
+    action: remote.list_devices
+    parameters:
+      role: "{{ filter_role }}"
+      labels: "{{ filter_labels }}"
+
+  - name: pre_check
+    description: Check current update status
+    action: remote.run_parallel
+    parameters:
+      command: |
+        {% if package_manager == 'apt' %}
+        apt list --upgradable 2>/dev/null | wc -l
+        {% elif package_manager == 'yum' or package_manager == 'dnf' %}
+        {{ package_manager }} check-update 2>/dev/null | wc -l
+        {% endif %}
+      timeout: 60
+
+  - name: update_packages
+    description: Update package lists
+    action: remote.run_parallel
+    parameters:
+      command: |
+        {% if package_manager == 'apt' %}
+        sudo apt update
+        {% elif package_manager == 'yum' or package_manager == 'dnf' %}
+        sudo {{ package_manager }} check-update
+        {% endif %}
+      timeout: 300
+
+  - name: upgrade_packages
+    description: Upgrade packages
+    condition: "{{ not update_only }}"
+    action: orchestrate
+    parameters:
+      strategy: "{{ strategy }}"
+      canary_count: "{{ canary_count }}"
+      max_concurrent: "{{ max_concurrent }}"
+      command: |
+        {% if package_manager == 'apt' %}
+        sudo DEBIAN_FRONTEND=noninteractive apt upgrade -y
+        {% elif package_manager == 'yum' %}
+        sudo yum upgrade -y
+        {% elif package_manager == 'dnf' %}
+        sudo dnf upgrade -y
+        {% endif %}
+      timeout: 600
+      post_check: "uptime"
+
+  - name: verify_update
+    description: Verify update completed
+    action: remote.run_parallel
+    parameters:
+      command: |
+        {% if package_manager == 'apt' %}
+        apt list --upgradable 2>/dev/null | wc -l
+        {% elif package_manager == 'yum' or package_manager == 'dnf' %}
+        {{ package_manager }} check-update 2>/dev/null | wc -l
+        {% endif %}
+      timeout: 60
+
+  - name: report_status
+    description: Report final status
+    action: remote.fleet_status
+    parameters:
+      check_connectivity: true
+
+on_failure:
+  - name: alert
+    action: log
+    parameters:
+      level: error
+      message: "Fleet update failed on some devices"
