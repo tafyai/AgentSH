@@ -15,7 +15,7 @@
 | 1 | Shell Wrapper MVP | Complete | Critical | Phase 0 |
 | 2 | LLM Integration & Agent Loop | Complete | Critical | Phase 1 |
 | 3 | Security Baseline | Complete | Critical | Phase 2 |
-| 4 | Tool Interface & Core Toolsets | Not Started | High | Phase 3 |
+| 4 | Tool Interface & Core Toolsets | Complete | High | Phase 3 |
 | 5 | LangGraph Workflows | Not Started | High | Phase 4 |
 | 6 | Memory & Context | Not Started | Medium | Phase 5 |
 | 7 | Telemetry & Monitoring | Not Started | Medium | Phase 4 |
@@ -579,32 +579,32 @@
 
 ### 4.1 Tool Registry
 
-- [ ] Create `src/agentsh/tools/__init__.py`
-- [ ] Implement `tools/registry.py`:
-  - [ ] `ToolRegistry` class (singleton):
-    - [ ] `register_tool(name, handler, schema, risk_level)`
-    - [ ] `get_tool(name) -> Tool`
-    - [ ] `list_tools() -> List[Tool]`
-    - [ ] `get_tools_for_llm() -> List[dict]`
-  - [ ] Validation of tool schemas
-  - [ ] Prevent duplicate registrations
+- [x] Create `src/agentsh/tools/__init__.py`
+- [x] Implement `tools/registry.py`:
+  - [x] `ToolRegistry` class (singleton):
+    - [x] `register_tool(name, handler, schema, risk_level)`
+    - [x] `get_tool(name) -> Tool`
+    - [x] `list_tools() -> List[Tool]`
+    - [x] `get_tools_for_llm() -> List[dict]`
+  - [x] Validation of tool schemas
+  - [x] Prevent duplicate registrations
 
 ### 4.2 Tool Base Classes
 
-- [ ] Implement `tools/base.py`:
-  - [ ] `Tool` dataclass:
-    - [ ] name, description, handler
-    - [ ] parameters (JSON schema)
-    - [ ] risk_level, requires_confirmation
-    - [ ] timeout_seconds, max_retries
-  - [ ] `ToolResult` dataclass:
-    - [ ] success, output, error, duration_ms
+- [x] Implement `tools/base.py`:
+  - [x] `Tool` dataclass:
+    - [x] name, description, handler
+    - [x] parameters (JSON schema)
+    - [x] risk_level, requires_confirmation
+    - [x] timeout_seconds, max_retries
+  - [x] `ToolResult` dataclass:
+    - [x] success, output, error, duration_ms
 
 ### 4.3 Tool Runner
 
-- [ ] Implement `tools/runner.py`:
-  - [ ] `ToolRunner` class:
-    - [ ] `execute(tool_name, args, context) -> ToolResult`:
+- [x] Implement `tools/runner.py`:
+  - [x] `ToolRunner` class:
+    - [x] `execute(tool_name, args, context) -> ToolResult`:
       1. Get tool from registry
       2. Validate arguments
       3. Check security (via SecurityController)
@@ -612,102 +612,118 @@
       5. Capture output/errors
       6. Emit telemetry
       7. Return result
-    - [ ] Retry logic
-    - [ ] Error wrapping
+    - [x] Retry logic
+    - [x] Error wrapping
 
 ### 4.4 Timeout Management
 
-- [ ] Implement `tools/timeout.py`:
-  - [ ] `TimeoutManager` class:
-    - [ ] `run_with_timeout(func, timeout) -> Any`
-    - [ ] Handle async functions
-    - [ ] Graceful cancellation
-    - [ ] Per-tool timeout configuration
+- [x] Timeout management integrated in `tools/runner.py`:
+  - [x] `_execute_with_timeout()` method:
+    - [x] `run_with_timeout(func, timeout) -> Any`
+    - [x] Handle async functions
+    - [x] Graceful cancellation
+    - [x] Per-tool timeout configuration
 
 ### 4.5 Shell Toolset
 
-- [ ] Implement `plugins/builtin/shell.py`:
-  - [ ] `ShellToolset(Toolset)`:
-    - [ ] `shell.run(command, cwd, env) -> ToolResult`:
-      - [ ] Execute command in shell
-      - [ ] Capture stdout, stderr, exit_code
-      - [ ] Risk level: varies by command
-    - [ ] `shell.explain(command) -> str`:
-      - [ ] Describe what command does
-      - [ ] Risk level: SAFE
+- [x] Implement `plugins/builtin/shell.py`:
+  - [x] `ShellToolset(Toolset)`:
+    - [x] `shell.run(command, cwd, env) -> ToolResult`:
+      - [x] Execute command in shell
+      - [x] Capture stdout, stderr, exit_code
+      - [x] Risk level: MEDIUM
+    - [x] `shell.explain(command) -> str`:
+      - [x] Describe what command does
+      - [x] Risk level: SAFE
+    - [x] `shell.which(program) -> str`:
+      - [x] Find executable in PATH
+      - [x] Risk level: SAFE
+    - [x] `shell.env(name) -> str`:
+      - [x] Get environment variable
+      - [x] Risk level: SAFE
 
 ### 4.6 Filesystem Toolset
 
-- [ ] Implement `plugins/builtin/filesystem.py`:
-  - [ ] `FilesystemToolset(Toolset)`:
-    - [ ] `fs.read(path, encoding) -> str`:
-      - [ ] Read file contents
-      - [ ] Risk level: SAFE
-    - [ ] `fs.write(path, content, mode) -> bool`:
-      - [ ] Write to file
-      - [ ] Risk level: MEDIUM
-    - [ ] `fs.list(path, recursive) -> List[str]`:
-      - [ ] List directory
-      - [ ] Risk level: SAFE
-    - [ ] `fs.delete(path) -> bool`:
-      - [ ] Delete file/directory
-      - [ ] Risk level: HIGH
-    - [ ] `fs.copy(src, dst) -> bool`:
-      - [ ] Copy file
-      - [ ] Risk level: MEDIUM
-    - [ ] `fs.search(pattern, path) -> List[str]`:
-      - [ ] Find files by pattern
-      - [ ] Risk level: SAFE
+- [x] Implement `plugins/builtin/filesystem.py`:
+  - [x] `FilesystemToolset(Toolset)`:
+    - [x] `fs.read(path, encoding) -> str`:
+      - [x] Read file contents
+      - [x] Risk level: SAFE
+    - [x] `fs.write(path, content, mode) -> bool`:
+      - [x] Write to file
+      - [x] Risk level: MEDIUM
+    - [x] `fs.list(path, recursive) -> List[str]`:
+      - [x] List directory
+      - [x] Risk level: SAFE
+    - [x] `fs.delete(path) -> bool`:
+      - [x] Delete file/directory
+      - [x] Risk level: HIGH
+    - [x] `fs.copy(src, dst) -> bool`:
+      - [x] Copy file
+      - [x] Risk level: MEDIUM
+    - [x] `fs.move(src, dst) -> bool`:
+      - [x] Move file
+      - [x] Risk level: MEDIUM
+    - [x] `fs.search(pattern, path) -> List[str]`:
+      - [x] Find files by pattern
+      - [x] Risk level: SAFE
+    - [x] `fs.info(path) -> FileInfo`:
+      - [x] Get file metadata
+      - [x] Risk level: SAFE
 
 ### 4.7 Process Toolset
 
-- [ ] Implement `plugins/builtin/process.py`:
-  - [ ] `ProcessToolset(Toolset)`:
-    - [ ] `process.list() -> List[ProcessInfo]`:
-      - [ ] List running processes
-      - [ ] Risk level: SAFE
-    - [ ] `process.kill(pid) -> bool`:
-      - [ ] Kill process
-      - [ ] Risk level: HIGH
-    - [ ] `process.info(pid) -> ProcessInfo`:
-      - [ ] Get process details
-      - [ ] Risk level: SAFE
+- [x] Implement `plugins/builtin/process.py`:
+  - [x] `ProcessToolset(Toolset)`:
+    - [x] `process.list() -> List[ProcessInfo]`:
+      - [x] List running processes
+      - [x] Risk level: SAFE
+    - [x] `process.kill(pid) -> bool`:
+      - [x] Kill process
+      - [x] Risk level: HIGH
+    - [x] `process.info(pid) -> ProcessInfo`:
+      - [x] Get process details
+      - [x] Risk level: SAFE
 
 ### 4.8 Code Toolset
 
-- [ ] Implement `plugins/builtin/code.py`:
-  - [ ] `CodeToolset(Toolset)`:
-    - [ ] `code.read(path, start_line, end_line) -> str`:
-      - [ ] Read code with line numbers
-      - [ ] Risk level: SAFE
-    - [ ] `code.edit(path, old_text, new_text) -> bool`:
-      - [ ] Make targeted edit
-      - [ ] Risk level: MEDIUM
-    - [ ] `code.search(pattern, path, file_pattern) -> List[Match]`:
-      - [ ] Search in code
-      - [ ] Risk level: SAFE
+- [x] Implement `plugins/builtin/code.py`:
+  - [x] `CodeToolset(Toolset)`:
+    - [x] `code.read(path, start_line, end_line) -> str`:
+      - [x] Read code with line numbers
+      - [x] Risk level: SAFE
+    - [x] `code.edit(path, old_text, new_text) -> bool`:
+      - [x] Make targeted edit
+      - [x] Risk level: MEDIUM
+    - [x] `code.search(pattern, path, file_pattern) -> List[Match]`:
+      - [x] Search in code
+      - [x] Risk level: SAFE
+    - [x] `code.insert(path, line, text) -> bool`:
+      - [x] Insert text at line
+      - [x] Risk level: MEDIUM
 
 ### Phase 4 Deliverables
 
-- [ ] Agent can use shell.run to execute commands
-- [ ] Agent can read/write files
-- [ ] Agent can list/kill processes
-- [ ] Agent can search/edit code
-- [ ] All tools have proper risk levels
-- [ ] Timeouts prevent hanging
+- [x] Agent can use shell.run to execute commands
+- [x] Agent can read/write files
+- [x] Agent can list/kill processes
+- [x] Agent can search/edit code
+- [x] All tools have proper risk levels
+- [x] Timeouts prevent hanging
 
 ### Phase 4 Tests
 
-- [ ] `tests/unit/test_tool_registry.py`:
-  - [ ] Test registration/lookup
-  - [ ] Test schema validation
-- [ ] `tests/unit/test_tool_runner.py`:
-  - [ ] Test execution flow
-  - [ ] Test timeout handling
-- [ ] `tests/integration/test_shell_toolset.py`:
-  - [ ] Test command execution
-- [ ] `tests/integration/test_filesystem_toolset.py`:
-  - [ ] Test file operations
+- [x] `tests/unit/test_tool_registry.py`:
+  - [x] Test registration/lookup
+  - [x] Test schema validation
+- [x] `tests/unit/test_tool_runner.py`:
+  - [x] Test execution flow
+  - [x] Test timeout handling
+- [x] `tests/unit/test_toolsets.py`:
+  - [x] Test ShellToolset
+  - [x] Test FilesystemToolset
+  - [x] Test ProcessToolset
+  - [x] Test CodeToolset
 
 ---
 

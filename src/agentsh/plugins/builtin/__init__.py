@@ -1,3 +1,13 @@
 """Built-in plugins for AgentSH."""
 
-# Builtin plugin implementations come in Phase 4
+from agentsh.plugins.builtin.code import CodeToolset
+from agentsh.plugins.builtin.filesystem import FilesystemToolset
+from agentsh.plugins.builtin.process import ProcessToolset
+from agentsh.plugins.builtin.shell import ShellToolset
+
+__all__ = [
+    "CodeToolset",
+    "FilesystemToolset",
+    "ProcessToolset",
+    "ShellToolset",
+]
