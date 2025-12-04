@@ -14,6 +14,14 @@ from agentsh.agent.llm_client import (
     ToolDefinition,
 )
 from agentsh.agent.prompts import build_system_prompt
+from agentsh.security.classifier import RiskLevel
+from agentsh.security.controller import (
+    SecurityContext,
+    SecurityController,
+    SecurityDecision,
+    ValidationResult,
+)
+from agentsh.security.rbac import Role, User
 from agentsh.telemetry.logger import get_logger, LoggerMixin
 from agentsh.tools.base import Tool, ToolResult
 from agentsh.tools.registry import ToolRegistry
@@ -85,7 +93,7 @@ class AgentLoop(LoggerMixin):
     1. Receives a user request
     2. Builds a conversation with system prompt
     3. Calls the LLM
-    4. If LLM requests tool calls, executes them
+    4. If LLM requests tool calls, executes them with security checks
     5. Appends tool results and loops
     6. Returns final response when done
 
@@ -93,6 +101,11 @@ class AgentLoop(LoggerMixin):
         agent = AgentLoop(llm_client, tool_registry, config)
         result = await agent.invoke("List all Python files")
         print(result.response)
+
+    With security:
+        security = SecurityController()
+        agent = AgentLoop(llm_client, tool_registry, config, security_controller=security)
+        result = await agent.invoke("List all Python files", context)
     """
 
     def __init__(
@@ -100,6 +113,7 @@ class AgentLoop(LoggerMixin):
         llm_client: LLMClient,
         tool_registry: ToolRegistry,
         config: Optional[AgentConfig] = None,
+        security_controller: Optional[SecurityController] = None,
     ) -> None:
         """Initialize the agent loop.
 
@@ -107,16 +121,19 @@ class AgentLoop(LoggerMixin):
             llm_client: LLM client for inference
             tool_registry: Registry of available tools
             config: Agent configuration
+            security_controller: Optional security controller for command validation
         """
         self.llm_client = llm_client
         self.tool_registry = tool_registry
         self.config = config or AgentConfig()
+        self.security_controller = security_controller
 
         self.logger.info(
             "AgentLoop initialized",
             provider=llm_client.provider,
             model=llm_client.model,
             max_steps=self.config.max_steps,
+            security_enabled=security_controller is not None,
         )
 
     async def invoke(
@@ -232,6 +249,56 @@ class AgentLoop(LoggerMixin):
             error="Max steps reached",
         )
 
+    def _build_security_context(self, context: AgentContext) -> SecurityContext:
+        """Build a SecurityContext from AgentContext.
+
+        Args:
+            context: Agent execution context
+
+        Returns:
+            SecurityContext for security checks
+        """
+        # Create user from context or use default
+        user = User(
+            id=context.user_id or "agent",
+            name=context.user_id or "agent",
+            role=Role.OPERATOR,  # Default to operator role
+        )
+
+        return SecurityContext(
+            user=user,
+            cwd=context.cwd or None,
+            env=context.env or None,
+            interactive=True,
+        )
+
+    def _check_command_security(
+        self,
+        command: str,
+        context: AgentContext,
+    ) -> tuple[bool, str]:
+        """Check if a command is allowed by security policy.
+
+        Args:
+            command: Command to check
+            context: Execution context
+
+        Returns:
+            Tuple of (allowed, message)
+        """
+        if not self.security_controller:
+            return True, "Security checks disabled"
+
+        security_context = self._build_security_context(context)
+        decision = self.security_controller.validate_and_approve(command, security_context)
+
+        if decision.result == ValidationResult.ALLOW:
+            return True, decision.reason
+        elif decision.result == ValidationResult.BLOCKED:
+            return False, f"Command blocked: {decision.reason}"
+        else:  # NEED_APPROVAL but we already ran validate_and_approve
+            return False, f"Approval required: {decision.reason}"
+
     async def _execute_tool(
         self,
         tool_call: ToolCall,
@@ -256,6 +323,20 @@ class AgentLoop(LoggerMixin):
             tool=tool_call.name,
             arguments=list(tool_call.arguments.keys()),
         )
+
+        # Check security for shell/command execution tools
+        if self.security_controller and tool.name in ("shell", "bash", "execute", "run_command"):
+            command = tool_call.arguments.get("command", "")
+            if command:
+                allowed, message = self._check_command_security(command, context)
+                if not allowed:
+                    self.logger.warning(
+                        "Tool execution blocked by security",
+                        tool=tool_call.name,
+                        command=command[:100],
+                        reason=message,
+                    )
+                    return f"Security: {message}"
 
         try:
             # Execute with timeout
