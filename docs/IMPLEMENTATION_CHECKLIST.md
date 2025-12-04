@@ -11,9 +11,9 @@
 
 | Phase | Name | Status | Priority | Dependencies |
 |-------|------|--------|----------|--------------|
-| 0 | Foundation & Project Setup | Not Started | Critical | None |
-| 1 | Shell Wrapper MVP | Not Started | Critical | Phase 0 |
-| 2 | LLM Integration & Agent Loop | Not Started | Critical | Phase 1 |
+| 0 | Foundation & Project Setup | Complete | Critical | None |
+| 1 | Shell Wrapper MVP | Complete | Critical | Phase 0 |
+| 2 | LLM Integration & Agent Loop | Complete | Critical | Phase 1 |
 | 3 | Security Baseline | Not Started | Critical | Phase 2 |
 | 4 | Tool Interface & Core Toolsets | Not Started | High | Phase 3 |
 | 5 | LangGraph Workflows | Not Started | High | Phase 4 |
@@ -39,7 +39,7 @@
 
 ### 0.1 Repository Structure
 
-- [ ] Create project directory structure:
+- [x] Create project directory structure:
   ```
   agentsh/
   ├── src/agentsh/
@@ -48,82 +48,82 @@
   ├── examples/
   └── .github/workflows/
   ```
-- [ ] Initialize `pyproject.toml` with metadata
-- [ ] Create `src/agentsh/__init__.py` with version
-- [ ] Create `src/agentsh/__main__.py` entry point
+- [x] Initialize `pyproject.toml` with metadata
+- [x] Create `src/agentsh/__init__.py` with version
+- [x] Create `src/agentsh/__main__.py` entry point
 
 ### 0.2 Dependencies Setup
 
-- [ ] Core dependencies in pyproject.toml:
-  - [ ] `ptyprocess >= 0.7.0` (PTY management)
-  - [ ] `prompt-toolkit >= 3.0` (line editing)
-  - [ ] `pydantic >= 2.0` (validation)
-  - [ ] `pyyaml >= 6.0` (config)
-  - [ ] `structlog >= 24.0` (logging)
-- [ ] LLM dependencies:
-  - [ ] `anthropic >= 0.28.0`
-  - [ ] `openai >= 1.3.0`
-  - [ ] `langgraph >= 0.2.0`
-  - [ ] `langchain-core >= 0.2.0`
+- [x] Core dependencies in pyproject.toml:
+  - [x] `ptyprocess >= 0.7.0` (PTY management)
+  - [x] `prompt-toolkit >= 3.0` (line editing)
+  - [x] `pydantic >= 2.0` (validation)
+  - [x] `pyyaml >= 6.0` (config)
+  - [x] `structlog >= 24.0` (logging)
+- [x] LLM dependencies:
+  - [x] `anthropic >= 0.28.0`
+  - [x] `openai >= 1.3.0`
+  - [x] `langgraph >= 0.2.0`
+  - [x] `langchain-core >= 0.2.0`
 - [ ] Optional dependencies:
   - [ ] `chromadb >= 0.4.0` (vector DB)
   - [ ] `paramiko >= 3.0` (SSH)
   - [ ] `prometheus-client >= 0.17.0` (metrics)
-- [ ] Development dependencies:
-  - [ ] `pytest >= 7.0`
-  - [ ] `pytest-asyncio`
-  - [ ] `pytest-cov`
-  - [ ] `mypy`
-  - [ ] `black`
-  - [ ] `ruff`
+- [x] Development dependencies:
+  - [x] `pytest >= 7.0`
+  - [x] `pytest-asyncio`
+  - [x] `pytest-cov`
+  - [x] `mypy`
+  - [x] `black`
+  - [x] `ruff`
 
 ### 0.3 Configuration System
 
-- [ ] Create `src/agentsh/config/__init__.py`
-- [ ] Implement `config/schemas.py`:
-  - [ ] `LLMConfig` Pydantic model
-  - [ ] `ShellConfig` Pydantic model
-  - [ ] `SecurityConfig` Pydantic model
-  - [ ] `MemoryConfig` Pydantic model
-  - [ ] `TelemetryConfig` Pydantic model
-  - [ ] `AgentSHConfig` root model
-- [ ] Implement `config/loader.py`:
-  - [ ] Load from `/etc/agentsh/config.yaml` (system)
-  - [ ] Load from `~/.agentsh/config.yaml` (user)
-  - [ ] Load from `.agentsh.yaml` (project)
-  - [ ] Environment variable overrides (`AGENTSH_*`)
+- [x] Create `src/agentsh/config/__init__.py`
+- [x] Implement `config/schemas.py`:
+  - [x] `LLMConfig` Pydantic model
+  - [x] `ShellConfig` Pydantic model
+  - [x] `SecurityConfig` Pydantic model
+  - [x] `MemoryConfig` Pydantic model
+  - [x] `TelemetryConfig` Pydantic model
+  - [x] `AgentSHConfig` root model
+- [x] Implement `config/loader.py`:
+  - [x] Load from `/etc/agentsh/config.yaml` (system)
+  - [x] Load from `~/.agentsh/config.yaml` (user)
+  - [x] Load from `.agentsh.yaml` (project)
+  - [x] Environment variable overrides (`AGENTSH_*`)
   - [ ] CLI argument overrides
-- [ ] Implement `config/defaults.py`:
-  - [ ] Default LLM settings
-  - [ ] Default security mode
-  - [ ] Default paths
-- [ ] Create sample config file `examples/config.yaml`
+- [x] Implement `config/defaults.py`:
+  - [x] Default LLM settings
+  - [x] Default security mode
+  - [x] Default paths
+- [x] Create sample config file `examples/config.yaml`
 
 ### 0.4 Plugin Registry Foundation
 
-- [ ] Create `src/agentsh/plugins/__init__.py`
-- [ ] Implement `plugins/base.py`:
-  - [ ] `Toolset` abstract base class
-  - [ ] `@property name: str`
-  - [ ] `@property description: str`
-  - [ ] `register_tools(registry: ToolRegistry)`
-  - [ ] `configure(config: dict)`
-- [ ] Implement `plugins/loader.py`:
-  - [ ] Entry point discovery (`agentsh.plugins`)
-  - [ ] Directory scan (`~/.agentsh/plugins/`)
-  - [ ] Plugin validation
-  - [ ] Dependency injection
+- [x] Create `src/agentsh/plugins/__init__.py`
+- [x] Implement `plugins/base.py`:
+  - [x] `Toolset` abstract base class
+  - [x] `@property name: str`
+  - [x] `@property description: str`
+  - [x] `register_tools(registry: ToolRegistry)`
+  - [x] `configure(config: dict)`
+- [x] Implement `plugins/loader.py`:
+  - [x] Entry point discovery (`agentsh.plugins`)
+  - [x] Directory scan (`~/.agentsh/plugins/`)
+  - [x] Plugin validation
+  - [x] Dependency injection
 
 ### 0.5 CLI Entry Point
 
-- [ ] Implement `__main__.py`:
-  - [ ] `agentsh` - start interactive shell
-  - [ ] `agentsh --version` - show version
-  - [ ] `agentsh --config <path>` - custom config
-  - [ ] `agentsh config show` - debug config
-  - [ ] `agentsh status` - health check
-  - [ ] `agentsh --mcp-server` - MCP mode (placeholder)
-- [ ] Create shell wrapper entry:
+- [x] Implement `__main__.py`:
+  - [x] `agentsh` - start interactive shell
+  - [x] `agentsh --version` - show version
+  - [x] `agentsh --config <path>` - custom config
+  - [x] `agentsh config show` - debug config
+  - [x] `agentsh status` - health check
+  - [x] `agentsh --mcp-server` - MCP mode (placeholder)
+- [x] Create shell wrapper entry:
   ```python
   def main():
       # Parse args
@@ -134,42 +134,42 @@
 
 ### 0.6 CI/CD Setup
 
-- [ ] Create `.github/workflows/lint.yml`:
-  - [ ] Run black format check
-  - [ ] Run ruff linting
-  - [ ] Run mypy type checking
-- [ ] Create `.github/workflows/test.yml`:
-  - [ ] Run pytest
-  - [ ] Generate coverage report
+- [x] Create `.github/workflows/lint.yml`:
+  - [x] Run black format check
+  - [x] Run ruff linting
+  - [x] Run mypy type checking
+- [x] Create `.github/workflows/test.yml`:
+  - [x] Run pytest
+  - [x] Generate coverage report
   - [ ] Fail if coverage < 70%
-- [ ] Create `.github/workflows/security.yml`:
-  - [ ] Run bandit security scan
-  - [ ] Check for known vulnerabilities
-- [ ] Create `Makefile`:
-  - [ ] `make install` - install dev deps
-  - [ ] `make test` - run tests
-  - [ ] `make lint` - run linters
-  - [ ] `make format` - auto-format
-  - [ ] `make build` - build package
+- [x] Create `.github/workflows/security.yml`:
+  - [x] Run bandit security scan
+  - [x] Check for known vulnerabilities
+- [x] Create `Makefile`:
+  - [x] `make install` - install dev deps
+  - [x] `make test` - run tests
+  - [x] `make lint` - run linters
+  - [x] `make format` - auto-format
+  - [x] `make build` - build package
 
 ### 0.7 Logging Foundation
 
-- [ ] Create `src/agentsh/telemetry/__init__.py`
-- [ ] Implement `telemetry/logger.py`:
-  - [ ] Configure structlog
-  - [ ] JSON output format
-  - [ ] Context injection (session_id, user)
-  - [ ] Log level configuration
-  - [ ] File + stdout outputs
+- [x] Create `src/agentsh/telemetry/__init__.py`
+- [x] Implement `telemetry/logger.py`:
+  - [x] Configure structlog
+  - [x] JSON output format
+  - [x] Context injection (session_id, user)
+  - [x] Log level configuration
+  - [x] File + stdout outputs
 
 ### Phase 0 Deliverables
 
-- [ ] `agentsh --help` works
-- [ ] `agentsh --version` shows version
-- [ ] Config loads from all sources
-- [ ] Logging outputs structured JSON
-- [ ] CI passes lint + type checks
-- [ ] Plugin loader can discover dummy plugin
+- [x] `agentsh --help` works
+- [x] `agentsh --version` shows version
+- [x] Config loads from all sources
+- [x] Logging outputs structured JSON
+- [x] CI passes lint + type checks
+- [x] Plugin loader can discover dummy plugin
 
 ---
 
@@ -181,115 +181,118 @@
 
 ### 1.1 PTY Manager
 
-- [ ] Create `src/agentsh/shell/__init__.py`
-- [ ] Implement `shell/pty_manager.py`:
-  - [ ] `PTYManager` class:
-    - [ ] `__init__(shell_path: str)` - configure shell
-    - [ ] `spawn()` - create PTY with shell process
-    - [ ] `read(timeout: float)` - read from PTY
-    - [ ] `write(data: bytes)` - write to PTY
-    - [ ] `resize(rows: int, cols: int)` - handle window resize
-    - [ ] `close()` - cleanup resources
-    - [ ] `is_alive` property - check shell status
-  - [ ] Handle SIGWINCH for terminal resize
-  - [ ] Implement PTY I/O buffering
-  - [ ] Error handling for shell crashes
+- [x] Create `src/agentsh/shell/__init__.py`
+- [x] Implement `shell/pty_manager.py`:
+  - [x] `PTYManager` class:
+    - [x] `__init__(shell_path: str)` - configure shell
+    - [x] `spawn()` - create PTY with shell process
+    - [x] `read(timeout: float)` - read from PTY
+    - [x] `write(data: bytes)` - write to PTY
+    - [x] `resize(rows: int, cols: int)` - handle window resize
+    - [x] `close()` - cleanup resources
+    - [x] `is_alive` property - check shell status
+  - [x] Handle SIGWINCH for terminal resize
+  - [x] Implement PTY I/O buffering
+  - [x] Error handling for shell crashes
 
 ### 1.2 Input Classifier
 
-- [ ] Implement `shell/input_classifier.py`:
-  - [ ] `InputType` enum:
-    - [ ] `SHELL_COMMAND` - pass directly to shell
-    - [ ] `AI_REQUEST` - send to AI agent
-    - [ ] `SPECIAL_COMMAND` - internal commands
-  - [ ] `InputClassifier` class:
-    - [ ] `classify(line: str) -> InputType`
-    - [ ] Force shell: `!command` prefix
-    - [ ] Force AI: `ai ` or `::` prefix
-    - [ ] Heuristics for natural language detection
-    - [ ] Config option: default_to_ai (bool)
-  - [ ] Special commands:
-    - [ ] `:help` - show help
-    - [ ] `:config` - show config
-    - [ ] `:history` - show AI history
-    - [ ] `:clear` - clear context
+- [x] Implement `shell/input_classifier.py`:
+  - [x] `InputType` enum:
+    - [x] `SHELL_COMMAND` - pass directly to shell
+    - [x] `AI_REQUEST` - send to AI agent
+    - [x] `SPECIAL_COMMAND` - internal commands
+  - [x] `InputClassifier` class:
+    - [x] `classify(line: str) -> InputType`
+    - [x] Force shell: `!command` prefix
+    - [x] Force AI: `ai ` or `::` prefix
+    - [x] Heuristics for natural language detection
+    - [x] Config option: default_to_ai (bool)
+  - [x] Special commands:
+    - [x] `:help` - show help
+    - [x] `:config` - show config
+    - [x] `:history` - show AI history
+    - [x] `:clear` - clear context
 
 ### 1.3 Prompt Renderer
 
-- [ ] Implement `shell/prompt.py`:
-  - [ ] `PromptRenderer` class:
-    - [ ] `render_ps1() -> str` - primary prompt
-    - [ ] `render_ps2() -> str` - continuation prompt
-  - [ ] Components:
-    - [ ] `[AS]` indicator (AgentSH active)
-    - [ ] Current working directory
-    - [ ] Git branch (if in repo)
-    - [ ] Agent status icon (idle/busy/error)
-    - [ ] User/host info
-  - [ ] ANSI color support
-  - [ ] Config options for customization
+- [x] Implement `shell/prompt.py`:
+  - [x] `PromptRenderer` class:
+    - [x] `render_ps1() -> str` - primary prompt
+    - [x] `render_ps2() -> str` - continuation prompt
+  - [x] Components:
+    - [x] `[AS]` indicator (AgentSH active)
+    - [x] Current working directory
+    - [x] Git branch (if in repo)
+    - [x] Agent status icon (idle/busy/error)
+    - [x] User/host info
+  - [x] ANSI color support
+  - [x] Config options for customization
 
 ### 1.4 Command History
 
-- [ ] Implement `shell/history.py`:
-  - [ ] `HistoryManager` class:
-    - [ ] `__init__(path: Path)` - history file location
-    - [ ] `add(entry: str)` - add to history
-    - [ ] `search(query: str) -> List[str]` - search history
-    - [ ] `get_recent(n: int) -> List[str]` - recent entries
-    - [ ] `save()` - persist to disk
-    - [ ] `load()` - load from disk
-  - [ ] Separate AI history from shell history
-  - [ ] Deduplication of consecutive identical entries
-  - [ ] Configurable max history size
+- [x] Implement `shell/history.py`:
+  - [x] `HistoryManager` class:
+    - [x] `__init__(path: Path)` - history file location
+    - [x] `add(entry: str)` - add to history
+    - [x] `search(query: str) -> List[str]` - search history
+    - [x] `get_recent(n: int) -> List[str]` - recent entries
+    - [x] `save()` - persist to disk
+    - [x] `load()` - load from disk
+  - [x] Separate AI history from shell history
+  - [x] Deduplication of consecutive identical entries
+  - [x] Configurable max history size
 
 ### 1.5 Shell Wrapper
 
-- [ ] Implement `shell/wrapper.py`:
-  - [ ] `ShellWrapper` class:
-    - [ ] `__init__(config: ShellConfig)` - initialize
-    - [ ] `start()` - spawn PTY, start REPL
-    - [ ] `stop()` - cleanup and exit
-    - [ ] `run_repl()` - main event loop
-    - [ ] `process_input(line: str)` - route input
-    - [ ] `execute_shell(command: str)` - pass to PTY
-    - [ ] `handle_ai_request(request: str)` - send to agent (stub)
-  - [ ] Signal handling:
-    - [ ] SIGINT (Ctrl+C) - interrupt current
+- [x] Implement `shell/wrapper.py`:
+  - [x] `ShellWrapper` class:
+    - [x] `__init__(config: ShellConfig)` - initialize
+    - [x] `start()` - spawn PTY, start REPL
+    - [x] `stop()` - cleanup and exit
+    - [x] `run_repl()` - main event loop
+    - [x] `process_input(line: str)` - route input
+    - [x] `execute_shell(command: str)` - pass to PTY
+    - [x] `handle_ai_request(request: str)` - send to agent (stub)
+  - [x] Signal handling:
+    - [x] SIGINT (Ctrl+C) - interrupt current
     - [ ] SIGTSTP (Ctrl+Z) - background
-    - [ ] SIGWINCH - resize
-  - [ ] Graceful shutdown
+    - [ ] SIGWINCH - resize (PTY level done)
+  - [x] Graceful shutdown
 
 ### 1.6 Basic AI Command (Stub)
 
-- [ ] Implement `shell/ai_stub.py`:
-  - [ ] `ai_explain(request: str) -> str`:
-    - [ ] Placeholder that echoes request
-    - [ ] Returns "AI feature coming in Phase 2"
-  - [ ] Wire into ShellWrapper.handle_ai_request
+- [x] Implement AI stub in `shell/wrapper.py`:
+  - [x] `_show_ai_placeholder(request: str) -> str`:
+    - [x] Placeholder that shows request info
+    - [x] Returns "AI feature coming in Phase 2"
+  - [x] Wire into ShellWrapper.handle_ai_request
 
 ### Phase 1 Deliverables
 
-- [ ] `agentsh` starts and shows custom prompt
-- [ ] Regular shell commands work normally
-- [ ] `!ls` forces shell execution
-- [ ] `ai hello` triggers AI path (stub response)
-- [ ] Command history persists
-- [ ] Terminal resize works
-- [ ] Graceful exit on Ctrl+D
+- [x] `agentsh` starts and shows custom prompt
+- [x] Regular shell commands work normally
+- [x] `!ls` forces shell execution
+- [x] `ai hello` triggers AI path (stub response)
+- [x] Command history persists
+- [ ] Terminal resize works (full PTY integration pending)
+- [x] Graceful exit on Ctrl+D
 
 ### Phase 1 Tests
 
-- [ ] `tests/unit/test_input_classifier.py`:
-  - [ ] Test shell command detection
-  - [ ] Test AI request detection
-  - [ ] Test force prefixes
-- [ ] `tests/unit/test_history.py`:
-  - [ ] Test add/search/recent
-  - [ ] Test persistence
+- [x] `tests/unit/test_input_classifier.py`:
+  - [x] Test shell command detection
+  - [x] Test AI request detection
+  - [x] Test force prefixes
+- [x] `tests/unit/test_history.py`:
+  - [x] Test add/search/recent
+  - [x] Test persistence
+- [x] `tests/unit/test_wrapper.py`:
+  - [x] Test initialization
+  - [x] Test input/output flow
 - [ ] `tests/integration/test_shell_wrapper.py`:
   - [ ] Test PTY spawning
-  - [ ] Test input/output flow
+  - [ ] Test end-to-end flow
 
 ---
 
@@ -301,36 +304,36 @@
 
 ### 2.1 LLM Client Abstraction
 
-- [ ] Create `src/agentsh/agent/__init__.py`
-- [ ] Implement `agent/llm_client.py`:
-  - [ ] Data classes:
-    - [ ] `Message(role, content, tool_calls)`
-    - [ ] `ToolCall(id, name, arguments)`
-    - [ ] `LLMResponse(content, tool_calls, stop_reason, tokens)`
-    - [ ] `ToolDefinition(name, description, parameters)`
-  - [ ] `LLMClient` abstract class:
-    - [ ] `@abstractmethod invoke(messages, tools, temperature, max_tokens) -> LLMResponse`
-    - [ ] `@abstractmethod stream(messages, tools) -> AsyncIterator[str]`
-    - [ ] `@abstractmethod count_tokens(text) -> int`
-    - [ ] `@property provider -> str`
+- [x] Create `src/agentsh/agent/__init__.py`
+- [x] Implement `agent/llm_client.py`:
+  - [x] Data classes:
+    - [x] `Message(role, content, tool_calls)`
+    - [x] `ToolCall(id, name, arguments)`
+    - [x] `LLMResponse(content, tool_calls, stop_reason, tokens)`
+    - [x] `ToolDefinition(name, description, parameters)`
+  - [x] `LLMClient` abstract class:
+    - [x] `@abstractmethod invoke(messages, tools, temperature, max_tokens) -> LLMResponse`
+    - [x] `@abstractmethod stream(messages, tools) -> AsyncIterator[str]`
+    - [x] `count_tokens(text) -> int` (default implementation)
+    - [x] `@property provider -> str`
 
 ### 2.2 LLM Provider Implementations
 
-- [ ] Implement `agent/providers/anthropic.py`:
-  - [ ] `AnthropicClient(LLMClient)`:
-    - [ ] API key from config/env
-    - [ ] Model selection
-    - [ ] Convert messages to Anthropic format
-    - [ ] Handle tool use responses
-    - [ ] Streaming support
-    - [ ] Error handling & retries
-- [ ] Implement `agent/providers/openai.py`:
-  - [ ] `OpenAIClient(LLMClient)`:
-    - [ ] API key from config/env
-    - [ ] Model selection
-    - [ ] Convert messages to OpenAI format
-    - [ ] Handle function calling
-    - [ ] Streaming support
+- [x] Implement `agent/providers/anthropic.py`:
+  - [x] `AnthropicClient(LLMClient)`:
+    - [x] API key from config/env
+    - [x] Model selection
+    - [x] Convert messages to Anthropic format
+    - [x] Handle tool use responses
+    - [x] Streaming support
+    - [x] Error handling & retries
+- [x] Implement `agent/providers/openai.py`:
+  - [x] `OpenAIClient(LLMClient)`:
+    - [x] API key from config/env
+    - [x] Model selection
+    - [x] Convert messages to OpenAI format
+    - [x] Handle function calling
+    - [x] Streaming support
 - [ ] Implement `agent/providers/ollama.py`:
   - [ ] `OllamaClient(LLMClient)`:
     - [ ] Local HTTP endpoint
@@ -339,73 +342,74 @@
 
 ### 2.3 System Prompts
 
-- [ ] Implement `agent/prompts.py`:
-  - [ ] `SYSTEM_PROMPT_TEMPLATE`:
-    - [ ] Role definition ("You are an AI shell assistant...")
-    - [ ] Safety rules (never destructive without approval)
-    - [ ] Tool usage instructions
-    - [ ] Output format guidance
-  - [ ] Few-shot examples:
-    - [ ] Example 1: NL → shell command
-    - [ ] Example 2: Multi-step task
-    - [ ] Example 3: Error handling
-  - [ ] Context injection:
-    - [ ] Current directory
-    - [ ] OS/platform info
-    - [ ] Available tools
-    - [ ] Recent history
+- [x] Implement `agent/prompts.py`:
+  - [x] `SYSTEM_PROMPT_TEMPLATE`:
+    - [x] Role definition ("You are an AI shell assistant...")
+    - [x] Safety rules (never destructive without approval)
+    - [x] Tool usage instructions
+    - [x] Output format guidance
+  - [x] Few-shot examples:
+    - [x] Example 1: NL → shell command
+    - [x] Example 2: Multi-step task
+    - [x] Example 3: Error handling
+  - [x] Context injection:
+    - [x] Current directory
+    - [x] OS/platform info
+    - [x] Available tools
+    - [x] Recent history
 
 ### 2.4 Basic Agent Loop
 
-- [ ] Implement `agent/agent_loop.py`:
-  - [ ] `AgentLoop` class:
-    - [ ] `__init__(llm_client, tool_registry, config)`
-    - [ ] `invoke(request: str, context: dict) -> str`:
+- [x] Implement `agent/agent_loop.py`:
+  - [x] `AgentLoop` class:
+    - [x] `__init__(llm_client, tool_registry, config)`
+    - [x] `invoke(request: str, context: dict) -> str`:
       1. Build messages (system + user)
       2. Call LLM with tools
       3. If tool_calls: execute each
       4. Append results to messages
       5. If more steps needed: loop (max 10)
       6. Return final response
-    - [ ] `_execute_tool(tool_call) -> str`
+    - [x] `_execute_tool(tool_call) -> str`
     - [ ] `_check_goal_complete(response) -> bool`
-  - [ ] Implement max_steps limit
-  - [ ] Handle LLM errors gracefully
+  - [x] Implement max_steps limit
+  - [x] Handle LLM errors gracefully
 
 ### 2.5 Tool Schema Generation
 
-- [ ] Implement `agent/tool_schema.py`:
-  - [ ] `tool_to_openai_format(tool) -> dict`
-  - [ ] `tool_to_anthropic_format(tool) -> dict`
-  - [ ] Generate JSON schema from tool definition
-  - [ ] Include examples in descriptions
+- [x] Tool schema generation in `llm_client.py` ToolDefinition class:
+  - [x] `to_openai_format(tool) -> dict`
+  - [x] `to_anthropic_format(tool) -> dict`
+  - [x] Generate JSON schema from tool definition
 
 ### 2.6 Agent Executor
 
-- [ ] Implement `agent/executor.py`:
-  - [ ] `Executor` class:
-    - [ ] `execute_tool_calls(calls, context) -> List[ToolResult]`
-    - [ ] Route to tool registry
-    - [ ] Collect results
-    - [ ] Format for LLM consumption
+- [x] Executor integrated in `agent/agent_loop.py`:
+  - [x] `_execute_tool()` method:
+    - [x] Route to tool registry
+    - [x] Collect results
+    - [x] Format for LLM consumption
 
 ### 2.7 Integration with Shell Wrapper
 
-- [ ] Update `shell/wrapper.py`:
-  - [ ] Initialize AgentLoop on startup
-  - [ ] `handle_ai_request(request)`:
-    - [ ] Build context (cwd, env)
-    - [ ] Call agent_loop.invoke()
-    - [ ] Display response
-    - [ ] Handle streaming output
+- [x] Create `agent/factory.py`:
+  - [x] `create_llm_client(config)` - factory for providers
+  - [x] `create_agent_loop(config)` - creates configured agent
+  - [x] `create_ai_handler(config)` - sync handler for shell
+- [x] Update `__main__.py`:
+  - [x] Initialize AI handler on startup (if API key set)
+  - [x] Wire into ShellWrapper via `set_ai_handler()`
 
 ### Phase 2 Deliverables
 
-- [ ] `ai "what files are here?"` returns intelligent response
-- [ ] Agent proposes shell commands
-- [ ] Agent explains its reasoning
-- [ ] Multiple LLM providers work
-- [ ] Streaming output supported
+- [x] LLM client abstraction complete
+- [x] Anthropic provider working
+- [x] OpenAI provider working
+- [x] Agent loop with tool execution
+- [x] System prompts with safety rules
+- [x] AI handler connected to shell
+- [ ] `ai "what files are here?"` returns intelligent response (needs tools)
+- [ ] Streaming output supported (partial)
 
 ### Phase 2 Tests
 

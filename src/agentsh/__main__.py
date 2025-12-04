@@ -164,6 +164,23 @@ def cmd_interactive_shell(config_path: Optional[Path], log_level: Optional[str])
         logger.info("Starting AgentSH", version=__version__)
 
         shell = ShellWrapper(config)
+
+        # Set up AI handler if API key is configured
+        if config.llm.api_key:
+            try:
+                from agentsh.agent.factory import create_ai_handler
+
+                ai_handler = create_ai_handler(config)
+                shell.set_ai_handler(ai_handler)
+                logger.info(
+                    "AI handler configured",
+                    provider=config.llm.provider.value,
+                    model=config.llm.model,
+                )
+            except Exception as e:
+                logger.warning("Failed to configure AI handler", error=str(e))
+                # Continue without AI - will show placeholder
+
         shell.run()
         return 0
 

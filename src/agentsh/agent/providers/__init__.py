@@ -1,3 +1,9 @@
-"""LLM provider implementations."""
+"""LLM Provider implementations."""
 
-# Provider implementations come in Phase 2
+from agentsh.agent.providers.anthropic import AnthropicClient
+from agentsh.agent.providers.openai import OpenAIClient
+
+__all__ = [
+    "AnthropicClient",
+    "OpenAIClient",
+]
