@@ -1697,6 +1697,13 @@
 - [x] `test_approval.py` - Approval flow tests
 - [x] `test_single_agent.py` - Single agent workflow tests
 - [x] `test_executor.py` - Workflow executor tests
+- [x] `test_defaults.py` - Config defaults tests
+- [x] `test_factory.py` - Agent factory tests
+- [x] `test_providers.py` - LLM provider tests
+- [x] `test_loader.py` - Plugin loader tests
+- [x] `test_remote_toolset.py` - Remote toolset tests
+- [x] `test_pty_manager.py` - PTY manager tests
+- [x] `test_security_controller.py` - Security controller tests
 
 ### Integration Tests (`tests/integration/`)
 - [ ] `test_shell_wrapper.py`
