@@ -18,7 +18,7 @@ from agentsh.utils.async_utils import (
     timeout,
     with_retry,
 )
-from agentsh.utils.env import get_env, get_env_or_fail
+from agentsh.utils.env import get_env, get_env_bool, get_env_int, get_env_or_fail
 from agentsh.utils.ux import (
     Color,
     ErrorContext,
@@ -81,6 +81,22 @@ from agentsh.utils.resource_manager import (
     register_cleanup,
     resource_guard,
 )
+from agentsh.utils.syntax import (
+    AnsiColor,
+    ColorScheme,
+    DARK_SCHEME,
+    LIGHT_SCHEME,
+    LanguageDefinition,
+    LANGUAGES,
+    PYTHON,
+    JAVASCRIPT,
+    BASH,
+    SyntaxHighlighter,
+    TokenType,
+    get_highlighter,
+    highlight,
+    highlight_file,
+)
 
 __all__ = [
     # Async utilities
@@ -102,6 +118,8 @@ __all__ = [
     "with_retry",
     # Environment
     "get_env",
+    "get_env_bool",
+    "get_env_int",
     "get_env_or_fail",
     # UX
     "Color",
@@ -160,4 +178,19 @@ __all__ = [
     "get_resource_manager",
     "register_cleanup",
     "resource_guard",
+    # Syntax highlighting
+    "AnsiColor",
+    "ColorScheme",
+    "DARK_SCHEME",
+    "LIGHT_SCHEME",
+    "LanguageDefinition",
+    "LANGUAGES",
+    "PYTHON",
+    "JAVASCRIPT",
+    "BASH",
+    "SyntaxHighlighter",
+    "TokenType",
+    "get_highlighter",
+    "highlight",
+    "highlight_file",
 ]

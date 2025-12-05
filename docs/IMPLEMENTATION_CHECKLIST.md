@@ -1420,7 +1420,7 @@
 - [x] Enhanced prompts:
   - [ ] Auto-suggestions during input
   - [x] Tab completion for tools (`shell/completer.py` - `ShellCompleter`)
-  - [ ] Syntax highlighting
+  - [x] Syntax highlighting (`utils/syntax.py` - `SyntaxHighlighter`, `highlight()`)
 - [x] Progress indicators:
   - [x] Spinner during LLM calls (`utils/ux.py` - `Spinner` class)
   - [x] Progress bar for long operations (`utils/ux.py` - `ProgressBar` class)
@@ -1639,6 +1639,7 @@
 - [x] `async_utils.py` - Async helpers (retry, rate limiting, timeouts)
 - [x] `markdown.py` - Markdown terminal rendering
 - [x] `resource_manager.py` - Resource management and cleanup
+- [x] `syntax.py` - Syntax highlighting for code
 
 ---
 
@@ -1691,6 +1692,11 @@
 - [x] `test_wrapper.py` - Shell wrapper tests
 - [x] `test_completer.py` - Tab completion tests
 - [x] `test_resource_manager.py` - Resource management tests
+- [x] `test_syntax.py` - Syntax highlighting tests
+- [x] `test_env.py` - Environment utilities tests
+- [x] `test_approval.py` - Approval flow tests
+- [x] `test_single_agent.py` - Single agent workflow tests
+- [x] `test_executor.py` - Workflow executor tests
 
 ### Integration Tests (`tests/integration/`)
 - [ ] `test_shell_wrapper.py`
