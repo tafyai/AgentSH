@@ -423,6 +423,7 @@ class ApprovalNode:
         """
         # Build approval request
         command = tool_call.arguments.get("command", str(tool_call.arguments))
+        context = state.get("context", {})
 
         from agentsh.security.approval import ApprovalRequest as ApprovalReq
 
@@ -430,6 +431,10 @@ class ApprovalNode:
             command=command,
             risk_level=RiskLevel.HIGH,
             reasons=[reason],
+            context={
+                "cwd": context.get("cwd", ""),
+                "user_id": context.get("user_id", ""),
+            },
         )
 
         response = self.approval_flow.request_approval(request)
@@ -522,9 +527,10 @@ class MemoryNode:
         agent_response = ""
 
         for msg in reversed(messages):
-            if msg.role == "assistant" and not agent_response:
+            role_value = msg.role.value if hasattr(msg.role, 'value') else msg.role
+            if role_value == "assistant" and not agent_response:
                 agent_response = msg.content or ""
-            elif msg.role == "user" and not user_input:
+            elif role_value == "user" and not user_input:
                 user_input = msg.content or ""
             if user_input and agent_response:
                 break

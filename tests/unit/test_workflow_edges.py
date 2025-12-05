@@ -211,3 +211,151 @@ class TestHelperFunctions:
             )
         ]
         assert needs_approval(state) is True
+
+
+class TestFleetWorkflowEdges:
+    """Test fleet/multi-device workflow edge functions."""
+
+    def test_should_continue_fleet_to_device(self) -> None:
+        """Should continue to device if not all processed."""
+        from agentsh.workflows.edges import should_continue_fleet
+
+        state = {
+            "devices": ["device-1", "device-2", "device-3"],
+            "device_results": {},
+        }
+
+        result = should_continue_fleet(state)
+        assert result == "device"
+
+    def test_should_continue_fleet_to_aggregate(self) -> None:
+        """Should go to aggregate when all devices processed."""
+        from agentsh.workflows.edges import should_continue_fleet
+        from unittest.mock import MagicMock
+
+        mock_result = MagicMock()
+        mock_result.success = True
+
+        state = {
+            "devices": ["device-1", "device-2"],
+            "device_results": {
+                "device-1": mock_result,
+                "device-2": mock_result,
+            },
+        }
+
+        result = should_continue_fleet(state)
+        assert result == "aggregate"
+
+    def test_should_continue_fleet_canary_failure_ends(self) -> None:
+        """Should end when canary fails with rollback enabled."""
+        from agentsh.workflows.edges import should_continue_fleet
+        from unittest.mock import MagicMock
+
+        failed_result = MagicMock()
+        failed_result.success = False
+
+        state = {
+            "devices": ["device-1", "device-2", "device-3", "device-4"],
+            "device_results": {
+                "device-1": failed_result,  # Canary failed
+            },
+            "canary_count": 1,
+            "rollback_on_failure": True,
+        }
+
+        result = should_continue_fleet(state)
+        assert result == "end"
+
+    def test_should_continue_fleet_canary_success(self) -> None:
+        """Should continue to next device when canary succeeds."""
+        from agentsh.workflows.edges import should_continue_fleet
+        from unittest.mock import MagicMock
+
+        success_result = MagicMock()
+        success_result.success = True
+
+        state = {
+            "devices": ["device-1", "device-2", "device-3", "device-4"],
+            "device_results": {
+                "device-1": success_result,  # Canary succeeded
+            },
+            "canary_count": 1,
+            "rollback_on_failure": True,
+        }
+
+        result = should_continue_fleet(state)
+        assert result == "device"
+
+    def test_should_continue_fleet_no_canary(self) -> None:
+        """Should continue normally without canary configuration."""
+        from agentsh.workflows.edges import should_continue_fleet
+        from unittest.mock import MagicMock
+
+        mock_result = MagicMock()
+        mock_result.success = True
+
+        state = {
+            "devices": ["device-1", "device-2", "device-3"],
+            "device_results": {"device-1": mock_result},
+            "canary_count": 0,
+        }
+
+        result = should_continue_fleet(state)
+        assert result == "device"
+
+    def test_should_rollback_true(self) -> None:
+        """Should return True when rollback is needed."""
+        from agentsh.workflows.edges import should_rollback
+        from unittest.mock import MagicMock
+
+        failed_result = MagicMock()
+        failed_result.success = False
+
+        state = {
+            "rollback_on_failure": True,
+            "device_results": {"device-1": failed_result},
+        }
+
+        assert should_rollback(state) is True
+
+    def test_should_rollback_false_no_failures(self) -> None:
+        """Should return False when no failures."""
+        from agentsh.workflows.edges import should_rollback
+        from unittest.mock import MagicMock
+
+        success_result = MagicMock()
+        success_result.success = True
+
+        state = {
+            "rollback_on_failure": True,
+            "device_results": {"device-1": success_result},
+        }
+
+        assert should_rollback(state) is False
+
+    def test_should_rollback_disabled(self) -> None:
+        """Should return False when rollback disabled."""
+        from agentsh.workflows.edges import should_rollback
+        from unittest.mock import MagicMock
+
+        failed_result = MagicMock()
+        failed_result.success = False
+
+        state = {
+            "rollback_on_failure": False,
+            "device_results": {"device-1": failed_result},
+        }
+
+        assert should_rollback(state) is False
+
+    def test_should_rollback_empty_results(self) -> None:
+        """Should return False with empty results."""
+        from agentsh.workflows.edges import should_rollback
+
+        state = {
+            "rollback_on_failure": True,
+            "device_results": {},
+        }
+
+        assert should_rollback(state) is False

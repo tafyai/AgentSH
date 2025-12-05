@@ -476,3 +476,190 @@ class TestCodeToolset:
 
         assert result.success
         assert code_file.read_text() == "line1\nline2\nline3\n"
+
+
+class TestShellToolsetExtended:
+    """Extended tests for shell toolset edge cases."""
+
+    @pytest.fixture
+    def shell_toolset(self, tool_registry: ToolRegistry) -> ShellToolset:
+        """Create shell toolset."""
+        toolset = ShellToolset()
+        toolset.register_tools(tool_registry)
+        return toolset
+
+    def test_run_empty_command(self, shell_toolset: ShellToolset) -> None:
+        """Should reject empty command."""
+        result = asyncio.run(shell_toolset.run_command(""))
+        assert not result.success
+        assert "Empty command" in result.error
+
+    def test_run_whitespace_command(self, shell_toolset: ShellToolset) -> None:
+        """Should reject whitespace-only command."""
+        result = asyncio.run(shell_toolset.run_command("   "))
+        assert not result.success
+        assert "Empty command" in result.error
+
+    def test_run_command_with_stderr(self, shell_toolset: ShellToolset) -> None:
+        """Should capture stderr output."""
+        result = asyncio.run(shell_toolset.run_command("ls /nonexistent_dir_xyz"))
+        # Command should fail and stderr should be captured
+        assert not result.success
+        assert "STDERR" in result.output or "No such file" in result.output
+
+    def test_run_command_with_cwd(self, shell_toolset: ShellToolset) -> None:
+        """Should run command in specified directory."""
+        result = asyncio.run(shell_toolset.run_command("pwd", cwd="/tmp"))
+        assert result.success
+        assert "/tmp" in result.output
+
+    def test_explain_empty_command(self, shell_toolset: ShellToolset) -> None:
+        """Should reject empty command for explain."""
+        result = shell_toolset.explain_command("")
+        assert not result.success
+        assert "Empty command" in result.error
+
+    def test_explain_invalid_syntax(self, shell_toolset: ShellToolset) -> None:
+        """Should handle invalid command syntax."""
+        result = shell_toolset.explain_command("echo 'unclosed quote")
+        assert not result.success
+        assert "Invalid command syntax" in result.error
+
+    def test_explain_unknown_command(self, shell_toolset: ShellToolset) -> None:
+        """Should provide generic explanation for unknown command."""
+        result = shell_toolset.explain_command("some_unknown_cmd -v arg1")
+        assert result.success
+        assert "some_unknown_cmd" in result.output
+        assert "Execute the 'some_unknown_cmd' command" in result.output
+
+    def test_explain_command_flags_and_args(self, shell_toolset: ShellToolset) -> None:
+        """Should show flags and arguments."""
+        result = shell_toolset.explain_command("grep -r -n pattern file.txt")
+        assert result.success
+        assert "Flags:" in result.output
+        assert "-r" in result.output
+        assert "Arguments:" in result.output
+        assert "pattern" in result.output
+
+    def test_which_empty_program(self, shell_toolset: ShellToolset) -> None:
+        """Should reject empty program name."""
+        result = shell_toolset.which("")
+        assert not result.success
+        assert "Empty program name" in result.error
+
+    def test_get_env_empty_name(self, shell_toolset: ShellToolset) -> None:
+        """Should reject empty variable name."""
+        result = shell_toolset.get_env("")
+        assert not result.success
+        assert "Empty variable name" in result.error
+
+    def test_toolset_properties(self, shell_toolset: ShellToolset) -> None:
+        """Should have correct name and description."""
+        assert shell_toolset.name == "shell"
+        assert "shell" in shell_toolset.description.lower()
+
+
+class TestCodeToolsetExtended:
+    """Extended tests for code toolset edge cases."""
+
+    @pytest.fixture
+    def code_toolset(self, tool_registry: ToolRegistry) -> CodeToolset:
+        """Create code toolset."""
+        toolset = CodeToolset()
+        toolset.register_tools(tool_registry)
+        return toolset
+
+    @pytest.fixture
+    def temp_dir(self) -> Path:
+        """Create a temporary directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    def test_read_code_file_not_found(self, code_toolset: CodeToolset) -> None:
+        """Should handle missing file."""
+        result = code_toolset.read_code("/nonexistent/file.py")
+        assert not result.success
+        assert "not found" in result.error.lower()
+
+    def test_edit_code_file_not_found(self, code_toolset: CodeToolset) -> None:
+        """Should handle missing file for edit."""
+        result = code_toolset.edit_code(
+            "/nonexistent/file.py",
+            old_text="old",
+            new_text="new",
+        )
+        assert not result.success
+        assert "not found" in result.error.lower()
+
+    def test_insert_code_invalid_line(
+        self, code_toolset: CodeToolset, temp_dir: Path
+    ) -> None:
+        """Should handle invalid line number."""
+        code_file = temp_dir / "test.py"
+        code_file.write_text("line1\nline2\n")
+
+        result = code_toolset.insert_code(str(code_file), line=100, text="new")
+        assert result.success  # Should append at end for out of range
+
+    def test_search_code_no_matches(
+        self, code_toolset: CodeToolset, temp_dir: Path
+    ) -> None:
+        """Should handle no matches."""
+        code_file = temp_dir / "test.py"
+        code_file.write_text("hello world")
+
+        result = code_toolset.search_code("nonexistent_xyz", path=str(temp_dir))
+        assert result.success
+        assert "no matches" in result.output.lower() or result.output == ""
+
+
+class TestFilesystemToolsetExtended:
+    """Extended tests for filesystem toolset edge cases."""
+
+    @pytest.fixture
+    def fs_toolset(self, tool_registry: ToolRegistry) -> FilesystemToolset:
+        """Create filesystem toolset."""
+        toolset = FilesystemToolset()
+        toolset.register_tools(tool_registry)
+        return toolset
+
+    @pytest.fixture
+    def temp_dir(self) -> Path:
+        """Create a temporary directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield Path(tmpdir)
+
+    def test_read_directory_error(self, fs_toolset: FilesystemToolset, temp_dir: Path) -> None:
+        """Should handle trying to read a directory as file."""
+        result = fs_toolset.read_file(str(temp_dir))
+        assert not result.success
+
+    def test_list_nonexistent_directory(self, fs_toolset: FilesystemToolset) -> None:
+        """Should handle listing nonexistent directory."""
+        result = fs_toolset.list_directory("/nonexistent/dir/xyz")
+        assert not result.success
+
+    def test_delete_nonexistent_file(self, fs_toolset: FilesystemToolset) -> None:
+        """Should handle deleting nonexistent file."""
+        result = fs_toolset.delete_file("/nonexistent/file.txt")
+        assert not result.success
+
+    def test_copy_nonexistent_source(self, fs_toolset: FilesystemToolset) -> None:
+        """Should handle copying nonexistent source."""
+        result = fs_toolset.copy_file("/nonexistent/src.txt", "/tmp/dst.txt")
+        assert not result.success
+
+    def test_move_nonexistent_source(self, fs_toolset: FilesystemToolset) -> None:
+        """Should handle moving nonexistent source."""
+        result = fs_toolset.move_file("/nonexistent/src.txt", "/tmp/dst.txt")
+        assert not result.success
+
+    def test_get_info_nonexistent(self, fs_toolset: FilesystemToolset) -> None:
+        """Should handle info for nonexistent path."""
+        result = fs_toolset.get_info("/nonexistent/file.txt")
+        assert not result.success
+
+    def test_toolset_properties(self, fs_toolset: FilesystemToolset) -> None:
+        """Should have correct name and description."""
+        assert fs_toolset.name == "filesystem"
+        assert "file" in fs_toolset.description.lower()

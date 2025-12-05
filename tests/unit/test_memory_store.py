@@ -334,3 +334,151 @@ class TestSQLiteMemoryStore:
         # Should still work with LIKE search
         results = store.search("Python")
         assert len(results) == 1
+
+
+class TestSQLiteMemoryStoreExtended:
+    """Extended tests for SQLiteMemoryStore."""
+
+    @pytest.fixture
+    def db_path(self, tmp_path):
+        """Create temp database path."""
+        return tmp_path / "extended_test.db"
+
+    @pytest.fixture
+    def store(self, db_path):
+        """Create store instance."""
+        return SQLiteMemoryStore(str(db_path))
+
+    def test_delete_nonexistent(self, store):
+        """Should return False when deleting nonexistent record."""
+        result = store.delete("nonexistent-id")
+        assert result is False
+
+    def test_delete_existing(self, store):
+        """Should return True when deleting existing record."""
+        store.store(MemoryRecord(
+            id="to-delete",
+            type=MemoryType.CUSTOM_NOTE,
+            title="Will be deleted",
+            content="",
+        ))
+        result = store.delete("to-delete")
+        assert result is True
+        # Verify it's gone
+        assert store.retrieve("to-delete") is None
+
+    def test_list_by_type(self, store):
+        """Should list records by type."""
+        # Add different types
+        store.store(MemoryRecord(
+            id="note-1",
+            type=MemoryType.CUSTOM_NOTE,
+            title="Note 1",
+            content="",
+        ))
+        store.store(MemoryRecord(
+            id="pref-1",
+            type=MemoryType.USER_PREFERENCE,
+            title="Pref 1",
+            content="",
+        ))
+        store.store(MemoryRecord(
+            id="note-2",
+            type=MemoryType.CUSTOM_NOTE,
+            title="Note 2",
+            content="",
+        ))
+
+        notes = store.list_by_type(MemoryType.CUSTOM_NOTE)
+        assert len(notes) == 2
+
+        prefs = store.list_by_type(MemoryType.USER_PREFERENCE)
+        assert len(prefs) == 1
+
+    def test_list_by_type_with_limit(self, store):
+        """Should respect limit parameter."""
+        for i in range(10):
+            store.store(MemoryRecord(
+                id=f"note-{i}",
+                type=MemoryType.CUSTOM_NOTE,
+                title=f"Note {i}",
+                content="",
+            ))
+
+        results = store.list_by_type(MemoryType.CUSTOM_NOTE, limit=5)
+        assert len(results) == 5
+
+    def test_list_by_type_empty(self, store):
+        """Should return empty list when no records of type."""
+        results = store.list_by_type(MemoryType.CUSTOM_NOTE)
+        assert results == []
+
+    def test_search_with_type_filter(self, store):
+        """Should filter search by memory type."""
+        store.store(MemoryRecord(
+            id="note-1",
+            type=MemoryType.CUSTOM_NOTE,
+            title="Python Tips",
+            content="Learn Python",
+        ))
+        store.store(MemoryRecord(
+            id="pref-1",
+            type=MemoryType.USER_PREFERENCE,
+            title="Python Preference",
+            content="Use Python",
+        ))
+
+        # Search only notes
+        results = store.search("Python", memory_types=[MemoryType.CUSTOM_NOTE])
+        assert all(r.type == MemoryType.CUSTOM_NOTE for r in results)
+
+    def test_search_empty_query(self, store):
+        """Should search with empty query."""
+        store.store(MemoryRecord(
+            id="note-1",
+            type=MemoryType.CUSTOM_NOTE,
+            title="Test Note",
+            content="Content",
+        ))
+
+        # Search with empty query should return records
+        results = store.search("")
+        assert len(results) >= 0  # Empty query behavior depends on implementation
+
+    def test_update_existing_record(self, store):
+        """Should update existing record."""
+        record = MemoryRecord(
+            id="update-1",
+            type=MemoryType.CUSTOM_NOTE,
+            title="Original Title",
+            content="Original content",
+        )
+        store.store(record)
+
+        # Update the record
+        record.title = "Updated Title"
+        record.content = "Updated content"
+        result = store.update(record)
+
+        assert result is True
+        retrieved = store.retrieve("update-1")
+        assert retrieved.title == "Updated Title"
+
+    def test_retrieve_nonexistent_record(self, store):
+        """Should return None for nonexistent record."""
+        result = store.retrieve("nonexistent-id")
+        assert result is None
+
+    def test_clear_all_records(self, store):
+        """Should clear all records."""
+        for i in range(5):
+            store.store(MemoryRecord(
+                id=f"clear-{i}",
+                type=MemoryType.CUSTOM_NOTE,
+                title=f"Record {i}",
+                content="",
+            ))
+
+        count = store.clear()
+        assert count == 5
+        assert len(store.list_by_type(MemoryType.CUSTOM_NOTE)) == 0

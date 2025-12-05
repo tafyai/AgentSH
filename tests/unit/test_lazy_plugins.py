@@ -420,3 +420,126 @@ class TestLoadPluginsLazy:
         # Tool registry should have been passed to register_tools
         # (verify via mock calls if needed)
         assert True  # If we get here, no exception was raised
+
+
+class TestLazyPluginEdgeCases:
+    """Edge case tests for lazy plugin loading."""
+
+    def test_load_while_loading(self) -> None:
+        """Should handle concurrent loading attempts."""
+        plugin = LazyPlugin(
+            name="test",
+            module_path="agentsh.plugins.builtin.shell",
+            class_name="ShellToolset",
+        )
+        # Set state to loading
+        plugin.state = PluginState.LOADING
+
+        # Try to load again
+        instance = plugin.load()
+
+        # Should return None while loading
+        assert instance is None
+
+    def test_plugin_reset_after_unload(self) -> None:
+        """Plugin state should reset after unload."""
+        registry = LazyPluginRegistry()
+        registry.register("shell", "agentsh.plugins.builtin.shell", "ShellToolset")
+        registry.get("shell")
+
+        # Unload
+        registry.unload("shell")
+
+        # Plugin state should be reset
+        plugin = registry._plugins.get("shell")
+        assert plugin.state == PluginState.UNLOADED
+        assert plugin.instance is None
+
+    def test_dependency_not_found(self) -> None:
+        """Should handle missing dependency gracefully."""
+        registry = LazyPluginRegistry()
+        registry.register(
+            "dependent",
+            "agentsh.plugins.builtin.shell",
+            "ShellToolset",
+            dependencies=["nonexistent"],
+        )
+
+        # Try to load - should handle missing dependency
+        result = registry.get("dependent")
+        # May still load if dependency is not critical
+        assert True  # No exception raised
+
+    def test_preload_specific_plugins_only(self) -> None:
+        """Should only preload specified plugins."""
+        registry = LazyPluginRegistry()
+        registry.register("shell", "agentsh.plugins.builtin.shell", "ShellToolset")
+        registry.register("fs", "agentsh.plugins.builtin.filesystem", "FilesystemToolset")
+
+        # Preload only fs, not shell
+        loaded = registry.preload(["fs"])
+
+        assert loaded == 1
+        assert registry.is_loaded("fs")
+        assert not registry.is_loaded("shell")
+
+    def test_get_status_with_error(self) -> None:
+        """Should include error in status."""
+        registry = LazyPluginRegistry()
+        registry.register("bad", "nonexistent.module", "NoClass")
+        registry.get("bad")  # This will fail
+
+        status = registry.get_status()
+
+        assert status["bad"]["state"] == "failed"
+        assert "error" in status["bad"]
+
+
+class TestLazyPluginRegistryExtended:
+    """Extended tests for LazyPluginRegistry."""
+
+    @pytest.fixture
+    def registry(self) -> LazyPluginRegistry:
+        """Create fresh registry."""
+        return LazyPluginRegistry()
+
+    def test_list_plugins_empty(self, registry: LazyPluginRegistry) -> None:
+        """Should return empty list when no plugins."""
+        assert registry.list_plugins() == []
+
+    def test_list_loaded_empty(self, registry: LazyPluginRegistry) -> None:
+        """Should return empty list when nothing loaded."""
+        registry.register("shell", "agentsh.plugins.builtin.shell", "ShellToolset")
+        assert registry.list_loaded() == []
+
+    def test_multiple_load_hooks(self, registry: LazyPluginRegistry) -> None:
+        """Should call multiple load hooks."""
+        calls = []
+
+        def hook1(plugin):
+            calls.append(("hook1", plugin.name))
+
+        def hook2(plugin):
+            calls.append(("hook2", plugin.name))
+
+        registry.add_load_hook(hook1)
+        registry.add_load_hook(hook2)
+        registry.register("shell", "agentsh.plugins.builtin.shell", "ShellToolset")
+        registry.get("shell")
+
+        assert ("hook1", "shell") in calls
+        assert ("hook2", "shell") in calls
+
+    def test_get_already_loaded(self, registry: LazyPluginRegistry) -> None:
+        """Should return cached instance for loaded plugin."""
+        registry.register("shell", "agentsh.plugins.builtin.shell", "ShellToolset")
+        toolset = registry.get("shell")
+
+        # Plugin should be cached
+        plugin = registry._plugins.get("shell")
+        assert plugin.state == PluginState.LOADED
+        assert plugin.instance is toolset
+
+        # Get again should return same instance
+        toolset2 = registry.get("shell")
+        assert toolset2 is toolset

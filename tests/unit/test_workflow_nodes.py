@@ -575,3 +575,322 @@ class TestErrorRecoveryNodeExtended:
         """Should have default max_retries of 2."""
         node = ErrorRecoveryNode()
         assert node.max_retries == 2
+
+
+class TestMemoryNodeExtended:
+    """Extended tests for MemoryNode."""
+
+    def test_store_turn_with_messages(self) -> None:
+        """Should store turn when messages present."""
+        mock_manager = MagicMock()
+        mock_manager.add_turn = MagicMock()
+        mock_manager.recall = MagicMock(return_value=[])
+
+        state = create_initial_state("Test goal")
+        state["messages"] = [
+            Message.user("User question"),
+            Message.assistant("Agent answer"),
+        ]
+        state["tools_used"] = []
+
+        node = MemoryNode(
+            memory_manager=mock_manager,
+            store_turns=True,
+            retrieve_context=False,
+        )
+        asyncio.run(node(state))
+
+        # Should have called add_turn
+        mock_manager.add_turn.assert_called_once()
+
+    def test_retrieve_context_with_goal(self) -> None:
+        """Should retrieve context when goal is set."""
+        from unittest.mock import MagicMock
+
+        mock_result = MagicMock()
+        mock_result.record = MagicMock()
+        mock_result.record.title = "Previous conversation"
+        mock_result.record.type = MagicMock(value="session")
+        mock_result.record.content = "Some previous context"
+        mock_result.score = 0.9
+
+        mock_manager = MagicMock()
+        mock_manager.recall = MagicMock(return_value=[mock_result])
+        mock_manager.get_context = MagicMock(return_value="Context text")
+
+        state = create_initial_state("Test goal")
+        state["goal"] = "Find relevant info"
+
+        node = MemoryNode(
+            memory_manager=mock_manager,
+            store_turns=False,
+            retrieve_context=True,
+        )
+        result = asyncio.run(node(state))
+
+        # Should have called recall
+        mock_manager.recall.assert_called()
+        # Should have context in result
+        assert "context" in result
+
+    def test_store_turn_skips_short_history(self) -> None:
+        """Should skip storing if not enough messages."""
+        mock_manager = MagicMock()
+        mock_manager.add_turn = MagicMock()
+
+        state = create_initial_state("Test")
+        state["messages"] = [Message.user("Single message")]
+
+        node = MemoryNode(
+            memory_manager=mock_manager,
+            store_turns=True,
+            retrieve_context=False,
+        )
+        asyncio.run(node(state))
+
+        # Should not call add_turn with only one message
+        mock_manager.add_turn.assert_not_called()
+
+    def test_retrieve_context_no_goal(self) -> None:
+        """Should skip retrieval without goal."""
+        mock_manager = MagicMock()
+        mock_manager.recall = MagicMock()
+
+        state = create_initial_state("")
+        state["goal"] = ""
+
+        node = MemoryNode(
+            memory_manager=mock_manager,
+            store_turns=False,
+            retrieve_context=True,
+        )
+        result = asyncio.run(node(state))
+
+        # Should not call recall without goal
+        mock_manager.recall.assert_not_called()
+        assert result == {}
+
+    def test_retrieve_context_handles_exception(self) -> None:
+        """Should handle retrieval errors gracefully."""
+        mock_manager = MagicMock()
+        mock_manager.recall = MagicMock(side_effect=Exception("DB error"))
+
+        state = create_initial_state("Test goal")
+        state["goal"] = "Find something"
+
+        node = MemoryNode(
+            memory_manager=mock_manager,
+            store_turns=False,
+            retrieve_context=True,
+        )
+        result = asyncio.run(node(state))
+
+        # Should return empty dict on error
+        assert result == {}
+
+    def test_store_turn_handles_exception(self) -> None:
+        """Should handle storage errors gracefully."""
+        mock_manager = MagicMock()
+        mock_manager.add_turn = MagicMock(side_effect=Exception("Storage error"))
+
+        state = create_initial_state("Test")
+        state["messages"] = [
+            Message.user("Question"),
+            Message.assistant("Answer"),
+        ]
+
+        node = MemoryNode(
+            memory_manager=mock_manager,
+            store_turns=True,
+            retrieve_context=False,
+        )
+
+        # Should not raise
+        result = asyncio.run(node(state))
+        assert isinstance(result, dict)
+
+
+class TestApprovalNodeWithSecurity:
+    """Test ApprovalNode with security controller."""
+
+    def test_blocks_dangerous_command(self) -> None:
+        """Should block dangerous commands."""
+        from agentsh.security.controller import (
+            SecurityContext,
+            SecurityController,
+            SecurityDecision,
+            ValidationResult,
+        )
+
+        mock_controller = MagicMock(spec=SecurityController)
+        mock_controller.check = MagicMock(
+            return_value=SecurityDecision(
+                result=ValidationResult.BLOCKED,
+                command="rm -rf /",
+                risk_assessment=MagicMock(),
+                reason="Dangerous command",
+            )
+        )
+
+        mock_approval_flow = MagicMock()
+        mock_approval_flow.request_approval = MagicMock()
+
+        tool_call = ToolCall(
+            id="call_1",
+            name="shell.run",
+            arguments={"command": "rm -rf /"},
+        )
+
+        state = create_initial_state("Delete files")
+        state["pending_tool_calls"] = [tool_call]
+        state["messages"] = []
+        state["context"] = {"user_id": "test", "cwd": "/"}
+
+        node = ApprovalNode(
+            security_controller=mock_controller,
+            approval_flow=mock_approval_flow,
+        )
+        result = asyncio.run(node(state))
+
+        # Should request approval for blocked command
+        mock_approval_flow.request_approval.assert_called_once()
+
+    def test_approves_safe_non_shell_command(self) -> None:
+        """Should not check security for non-shell tools."""
+        mock_controller = MagicMock()
+        mock_controller.check = MagicMock()
+
+        tool_call = ToolCall(
+            id="call_1",
+            name="math.add",  # Not a shell command
+            arguments={"a": 1, "b": 2},
+        )
+
+        state = create_initial_state("Add numbers")
+        state["pending_tool_calls"] = [tool_call]
+        state["messages"] = []
+
+        node = ApprovalNode(security_controller=mock_controller)
+        result = asyncio.run(node(state))
+
+        # Should not check security for non-shell tool
+        mock_controller.check.assert_not_called()
+        # Should keep the tool call
+        assert len(result["pending_tool_calls"]) == 1
+
+
+class TestAgentNodeBuildToolDefinitions:
+    """Test AgentNode._build_tool_definitions method."""
+
+    @pytest.fixture
+    def mock_llm_client(self) -> MagicMock:
+        """Create mock LLM client."""
+        client = MagicMock()
+        client.invoke = AsyncMock()
+        return client
+
+    @pytest.fixture
+    def tool_registry(self) -> ToolRegistry:
+        """Create tool registry with test tools."""
+        registry = ToolRegistry()
+        registry.register_tool(
+            name="test.tool1",
+            handler=lambda: ToolResult(success=True, output="ok"),
+            description="First tool",
+            parameters={
+                "type": "object",
+                "properties": {"x": {"type": "string"}},
+                "required": ["x"],
+            },
+        )
+        registry.register_tool(
+            name="test.tool2",
+            handler=lambda: ToolResult(success=True, output="ok"),
+            description="Second tool",
+            parameters={
+                "type": "object",
+                "properties": {"y": {"type": "integer"}},
+                "required": [],
+            },
+        )
+        return registry
+
+    def test_builds_definitions_for_all_tools(
+        self, mock_llm_client: MagicMock, tool_registry: ToolRegistry
+    ) -> None:
+        """Should build definitions for all registered tools."""
+        node = AgentNode(mock_llm_client, tool_registry)
+        definitions = node._build_tool_definitions()
+
+        assert len(definitions) == 2
+
+        names = [d.name for d in definitions]
+        assert "test.tool1" in names
+        assert "test.tool2" in names
+
+    def test_definitions_include_parameters(
+        self, mock_llm_client: MagicMock, tool_registry: ToolRegistry
+    ) -> None:
+        """Should include parameters in definitions."""
+        node = AgentNode(mock_llm_client, tool_registry)
+        definitions = node._build_tool_definitions()
+
+        tool1_def = next(d for d in definitions if d.name == "test.tool1")
+        assert "x" in tool1_def.parameters
+        assert tool1_def.required == ["x"]
+
+
+class TestToolNodeMultipleTools:
+    """Test ToolNode with multiple tool calls."""
+
+    @pytest.fixture
+    def tool_registry(self) -> ToolRegistry:
+        """Create tool registry with test tools."""
+        registry = ToolRegistry()
+
+        registry.register_tool(
+            name="tool.a",
+            handler=lambda: ToolResult(success=True, output="A"),
+            description="Tool A",
+            parameters={"type": "object", "properties": {}},
+        )
+
+        registry.register_tool(
+            name="tool.b",
+            handler=lambda: ToolResult(success=True, output="B"),
+            description="Tool B",
+            parameters={"type": "object", "properties": {}},
+        )
+
+        return registry
+
+    def test_executes_multiple_tools(self, tool_registry: ToolRegistry) -> None:
+        """Should execute multiple tool calls in sequence."""
+        tool_calls = [
+            ToolCall(id="call_1", name="tool.a", arguments={}),
+            ToolCall(id="call_2", name="tool.b", arguments={}),
+        ]
+
+        state = create_initial_state("Test")
+        state["pending_tool_calls"] = tool_calls
+        state["messages"] = []
+
+        node = ToolNode(tool_registry)
+        result = asyncio.run(node(state))
+
+        assert len(result["tools_used"]) == 2
+        assert result["tools_used"][0].name == "tool.a"
+        assert result["tools_used"][1].name == "tool.b"
+
+    def test_records_duration(self, tool_registry: ToolRegistry) -> None:
+        """Should record duration for each tool."""
+        tool_call = ToolCall(id="call_1", name="tool.a", arguments={})
+
+        state = create_initial_state("Test")
+        state["pending_tool_calls"] = [tool_call]
+        state["messages"] = []
+
+        node = ToolNode(tool_registry)
+        result = asyncio.run(node(state))
+
+        assert result["tools_used"][0].duration_ms >= 0

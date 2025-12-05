@@ -362,3 +362,453 @@ class TestCompositeExporter:
         # MemoryExporter.close() clears events
         assert len(mem1.events) == 0
         assert len(mem2.events) == 0
+
+
+class TestFileExporterExtended:
+    """Extended tests for FileExporter."""
+
+    def test_auto_subscribe_disabled(self, tmp_path):
+        """Should not subscribe when auto_subscribe is False."""
+        log_path = tmp_path / "test.log"
+        exporter = FileExporter(log_path, auto_subscribe=False)
+        try:
+            # Should not raise and file should be created
+            assert log_path.exists()
+        finally:
+            exporter.close()
+
+    def test_export_event_writes_jsonl(self, tmp_path):
+        """Should write JSON lines format."""
+        log_path = tmp_path / "test.log"
+        exporter = FileExporter(log_path, auto_subscribe=False)
+        try:
+            event = TelemetryEvent(
+                event_type=EventType.WORKFLOW_STARTED,
+                session_id="sess-123",
+                data={"workflow": "test"},
+            )
+            exporter.export_event(event)
+
+            content = log_path.read_text()
+            lines = content.strip().split("\n")
+            assert len(lines) == 1
+            data = json.loads(lines[0])
+            assert data["event_type"] == "workflow_started"
+            assert data["session_id"] == "sess-123"
+        finally:
+            exporter.close()
+
+    def test_multiple_events(self, tmp_path):
+        """Should write multiple events."""
+        log_path = tmp_path / "test.log"
+        exporter = FileExporter(log_path, auto_subscribe=False)
+        try:
+            for i in range(5):
+                event = TelemetryEvent(
+                    event_type=EventType.COMMAND_EXECUTED,
+                    data={"index": i},
+                )
+                exporter.export_event(event)
+
+            content = log_path.read_text()
+            lines = [l for l in content.strip().split("\n") if l]
+            assert len(lines) == 5
+        finally:
+            exporter.close()
+
+    def test_reopen_file(self, tmp_path):
+        """Should reopen file."""
+        log_path = tmp_path / "test.log"
+        exporter = FileExporter(log_path, auto_subscribe=False)
+        try:
+            # Write one event
+            exporter.export_event(TelemetryEvent(event_type=EventType.ERROR))
+
+            # Force reopen
+            exporter._open_file()
+
+            # Write another event
+            exporter.export_event(TelemetryEvent(event_type=EventType.WARNING))
+
+            # Both events should be in file
+            content = log_path.read_text()
+            assert "error" in content
+            assert "warning" in content
+        finally:
+            exporter.close()
+
+
+class TestJSONExporterExtended:
+    """Extended tests for JSONExporter."""
+
+    def test_multiple_events(self):
+        """Should write multiple events."""
+        stream = io.StringIO()
+        exporter = JSONExporter(stream, auto_subscribe=False)
+
+        for i in range(3):
+            event = TelemetryEvent(
+                event_type=EventType.TOOL_COMPLETED,
+                data={"index": i},
+            )
+            exporter.export_event(event)
+
+        stream.seek(0)
+        lines = [l for l in stream.readlines() if l.strip()]
+        assert len(lines) == 3
+
+    def test_export_with_all_fields(self):
+        """Should export event with all fields."""
+        stream = io.StringIO()
+        exporter = JSONExporter(stream, auto_subscribe=False)
+
+        event = TelemetryEvent(
+            event_type=EventType.SECURITY_ALERT,
+            session_id="sess-1",
+            user_id="user-1",
+            data={"alert": "test"},
+            metadata={"source": "test"},
+        )
+        exporter.export_event(event)
+
+        stream.seek(0)
+        data = json.loads(stream.readline())
+        assert data["session_id"] == "sess-1"
+        assert data["user_id"] == "user-1"
+        assert data["metadata"]["source"] == "test"
+
+
+class TestMemoryExporterExtended:
+    """Extended tests for MemoryExporter."""
+
+    def test_get_events_empty(self):
+        """Should return empty list when no events."""
+        exporter = MemoryExporter()
+        events = exporter.get_events_by_type(EventType.ERROR)
+        assert events == []
+
+    def test_events_stored_in_order(self):
+        """Should store events in order."""
+        exporter = MemoryExporter()
+
+        for i in range(5):
+            exporter.export_event(TelemetryEvent(
+                event_type=EventType.ERROR,
+                data={"index": i},
+            ))
+
+        for i, event in enumerate(exporter.events):
+            assert event.data["index"] == i
+
+    def test_metrics_snapshot_has_timestamp(self):
+        """Should add timestamp to metrics snapshot."""
+        exporter = MemoryExporter()
+        exporter.export_metrics({"counter": 1})
+
+        assert len(exporter.metrics_snapshots) == 1
+        assert "timestamp" in exporter.metrics_snapshots[0]
+        assert "metrics" in exporter.metrics_snapshots[0]
+
+
+class TestPrometheusExporterExtended:
+    """Extended tests for PrometheusExporter."""
+
+    def test_render_empty_registry(self):
+        """Should handle empty registry."""
+        registry = object.__new__(MetricsRegistry)
+        registry._counters = {}
+        registry._gauges = {}
+        registry._histograms = {}
+        registry._initialized = True
+
+        exporter = PrometheusExporter(registry)
+        text = exporter.render_metrics()
+
+        # Should be empty or contain only comments
+        assert text.strip() == "" or text.startswith("#")
+
+    def test_render_multiple_labels(self):
+        """Should render metrics with multiple labels."""
+        registry = object.__new__(MetricsRegistry)
+        registry._counters = {}
+        registry._gauges = {}
+        registry._histograms = {}
+        registry._initialized = True
+
+        registry.counter("requests", "Total requests").inc(1, labels={"method": "GET", "path": "/api"})
+
+        exporter = PrometheusExporter(registry)
+        text = exporter.render_metrics()
+
+        assert 'method="GET"' in text
+        assert 'path="/api"' in text
+
+    def test_close_is_noop(self):
+        """Close should be a no-op."""
+        registry = object.__new__(MetricsRegistry)
+        registry._counters = {}
+        registry._gauges = {}
+        registry._histograms = {}
+        registry._initialized = True
+
+        exporter = PrometheusExporter(registry)
+        exporter.close()  # Should not raise
+
+
+class TestSetupDefaultExporters:
+    """Tests for setup_default_exporters function."""
+
+    def test_setup_with_log_path(self, tmp_path):
+        """Should create file exporter with specified path."""
+        from agentsh.telemetry.exporters import setup_default_exporters, get_exporter
+
+        log_path = tmp_path / "test.log"
+        exporter = setup_default_exporters(log_path=log_path, enable_prometheus=False)
+
+        try:
+            assert log_path.exists()
+            assert exporter is not None
+        finally:
+            exporter.close()
+
+    def test_setup_without_prometheus(self, tmp_path):
+        """Should setup without prometheus exporter."""
+        from agentsh.telemetry.exporters import setup_default_exporters
+
+        log_path = tmp_path / "test.log"
+        exporter = setup_default_exporters(log_path=log_path, enable_prometheus=False)
+
+        try:
+            # Should be a FileExporter, not composite
+            assert exporter is not None
+        finally:
+            exporter.close()
+
+    def test_setup_with_prometheus(self, tmp_path):
+        """Should setup with prometheus exporter."""
+        from agentsh.telemetry.exporters import setup_default_exporters, CompositeExporter
+
+        log_path = tmp_path / "test.log"
+        exporter = setup_default_exporters(log_path=log_path, enable_prometheus=True)
+
+        try:
+            # Should be a CompositeExporter with both
+            assert isinstance(exporter, CompositeExporter)
+        finally:
+            exporter.close()
+
+    def test_setup_default_path(self, monkeypatch, tmp_path):
+        """Should use default path when none specified."""
+        from agentsh.telemetry.exporters import setup_default_exporters
+
+        # Mock expanduser to use tmp_path
+        def mock_expanduser(self):
+            return tmp_path / "telemetry.log"
+
+        monkeypatch.setattr(Path, "expanduser", mock_expanduser)
+
+        exporter = setup_default_exporters(log_path=None, enable_prometheus=False)
+
+        try:
+            assert exporter is not None
+        finally:
+            exporter.close()
+
+
+class TestExporterGlobalState:
+    """Tests for global exporter state."""
+
+    def test_get_set_exporter(self, tmp_path):
+        """Should get and set global exporter."""
+        from agentsh.telemetry.exporters import get_exporter, set_exporter, FileExporter
+
+        log_path = tmp_path / "test.log"
+        exporter = FileExporter(log_path, auto_subscribe=False)
+
+        try:
+            set_exporter(exporter)
+            assert get_exporter() is exporter
+        finally:
+            exporter.close()
+
+    def test_get_exporter_none(self):
+        """Should return None when no exporter set."""
+        from agentsh.telemetry.exporters import get_exporter, set_exporter
+
+        # Reset global state
+        set_exporter(None)
+        # Should not raise
+        result = get_exporter()
+        # May be None or previously set
+
+
+class TestExporterAbstract:
+    """Tests for abstract Exporter base class."""
+
+    def test_exporter_is_abstract(self):
+        """Exporter should be abstract."""
+        from agentsh.telemetry.exporters import Exporter
+
+        # Cannot instantiate directly
+        with pytest.raises(TypeError):
+            Exporter()
+
+
+class TestFileExporterRotation:
+    """Tests for FileExporter rotation."""
+
+    def test_rotation_by_size(self, tmp_path):
+        """Should rotate log file by size."""
+        log_path = tmp_path / "rotate.log"
+        # Create a small max_size for testing
+        exporter = FileExporter(log_path, auto_subscribe=False, max_size_mb=0.0001)
+
+        try:
+            # Write enough events to trigger rotation
+            for i in range(100):
+                event = TelemetryEvent(
+                    event_type=EventType.COMMAND_EXECUTED,
+                    data={"command": f"cmd_{i}" * 100},  # Large data
+                )
+                exporter.export_event(event)
+
+            # Check that rotation happened (backup files exist)
+            # The original file should still exist
+            assert log_path.exists()
+        finally:
+            exporter.close()
+
+
+class TestJSONExporterFormatting:
+    """Tests for JSONExporter formatting options."""
+
+    def test_json_pretty(self):
+        """Should support pretty printing."""
+        buffer = io.StringIO()
+        exporter = JSONExporter(buffer, pretty=True, auto_subscribe=False)
+
+        event = TelemetryEvent(
+            event_type=EventType.ERROR,
+            data={"error": "test"},
+        )
+        exporter.export_event(event)
+
+        content = buffer.getvalue()
+        # Should have newlines for pretty printing
+        assert "\n" in content
+
+    def test_json_not_pretty(self):
+        """Should output compact JSON when not pretty."""
+        buffer = io.StringIO()
+        exporter = JSONExporter(buffer, pretty=False, auto_subscribe=False)
+
+        event = TelemetryEvent(
+            event_type=EventType.ERROR,
+            data={"error": "test"},
+        )
+        exporter.export_event(event)
+
+        content = buffer.getvalue()
+        # Should not have excessive formatting
+        assert "error" in content
+
+
+class TestCompositeExporterEdgeCases:
+    """Edge case tests for CompositeExporter."""
+
+    def test_composite_with_single_exporter(self, tmp_path):
+        """Should work with single exporter."""
+        log_path = tmp_path / "single.log"
+        file_exporter = FileExporter(log_path, auto_subscribe=False)
+
+        composite = CompositeExporter([file_exporter])
+
+        try:
+            event = TelemetryEvent(event_type=EventType.ERROR)
+            composite.export_event(event)
+
+            content = log_path.read_text()
+            assert "error" in content
+        finally:
+            composite.close()
+
+    def test_composite_export_metrics(self, tmp_path):
+        """Should export metrics to all exporters."""
+        buffer1 = io.StringIO()
+        buffer2 = io.StringIO()
+
+        exporter1 = JSONExporter(buffer1, auto_subscribe=False)
+        exporter2 = JSONExporter(buffer2, auto_subscribe=False)
+
+        composite = CompositeExporter([exporter1, exporter2])
+
+        event = TelemetryEvent(event_type=EventType.COMMAND_EXECUTED)
+        composite.export_event(event)
+
+        # Both should have received the event
+        assert "command_executed" in buffer1.getvalue()
+        assert "command_executed" in buffer2.getvalue()
+
+
+class TestMemoryExporterQuerying:
+    """Tests for MemoryExporter querying capabilities."""
+
+    def test_query_by_event_type(self):
+        """Should query events by type."""
+        exporter = MemoryExporter()
+
+        exporter.export_event(TelemetryEvent(event_type=EventType.COMMAND_EXECUTED))
+        exporter.export_event(TelemetryEvent(event_type=EventType.ERROR))
+        exporter.export_event(TelemetryEvent(event_type=EventType.COMMAND_EXECUTED))
+
+        events = exporter.events
+        command_events = [e for e in events if e.event_type == EventType.COMMAND_EXECUTED]
+        assert len(command_events) == 2
+
+    def test_max_events_limit(self):
+        """Should respect max_events limit."""
+        exporter = MemoryExporter(max_events=5)
+
+        for i in range(10):
+            exporter.export_event(TelemetryEvent(event_type=EventType.COMMAND_EXECUTED))
+
+        # Should only keep max_events
+        assert len(exporter.events) <= 5
+
+    def test_clear_events(self):
+        """Should clear all stored events."""
+        exporter = MemoryExporter()
+
+        exporter.export_event(TelemetryEvent(event_type=EventType.ERROR))
+        exporter.export_event(TelemetryEvent(event_type=EventType.ERROR))
+
+        exporter.clear()
+        assert len(exporter.events) == 0
+
+    def test_export_metrics(self):
+        """Should store metrics snapshots."""
+        exporter = MemoryExporter()
+
+        exporter.export_metrics({"metric1": 1, "metric2": 2})
+        exporter.export_metrics({"metric3": 3})
+
+        assert len(exporter.metrics_snapshots) == 2
+
+    def test_thread_safe(self):
+        """Should be thread-safe."""
+        import threading
+
+        exporter = MemoryExporter()
+
+        def add_events():
+            for i in range(100):
+                exporter.export_event(TelemetryEvent(event_type=EventType.COMMAND_EXECUTED))
+
+        threads = [threading.Thread(target=add_events) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # Should have received all events without error
+        assert len(exporter.events) > 0

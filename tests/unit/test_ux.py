@@ -389,3 +389,192 @@ class TestOutputBuffer:
         buf = OutputBuffer()
         buf.add("Test")
         assert str(buf) == "Test"
+
+    def test_buffer_add_header_level2(self) -> None:
+        """Should add level 2 header."""
+        buf = OutputBuffer(use_color=False)
+        buf.add_header("Section", level=2)
+        output = buf.render()
+        assert "Section" in output
+        assert "-" in output
+
+    def test_buffer_add_header_level3(self) -> None:
+        """Should add level 3 header."""
+        buf = OutputBuffer(use_color=False)
+        buf.add_header("Subsection", level=3)
+        output = buf.render()
+        assert "Subsection" in output
+
+    def test_buffer_add_table(self) -> None:
+        """Should add table to buffer."""
+        buf = OutputBuffer(use_color=False)
+        table = Table([TableColumn("Name", "name"), TableColumn("Value", "value")])
+        table.add_row({"name": "Key", "value": "Val"})
+        buf.add_table(table)
+        output = buf.render()
+        assert "Name" in output
+        assert "Key" in output
+
+
+class TestStatusContextManager:
+    """Tests for status context manager."""
+
+    def test_status_success(self) -> None:
+        """Should show success on normal completion."""
+        from agentsh.utils.ux import status
+
+        stream = io.StringIO()
+        with status("Testing", stream=stream, use_color=False) as s:
+            pass  # Success path
+        # Should complete without error
+
+    def test_status_with_update(self) -> None:
+        """Should update spinner message."""
+        from agentsh.utils.ux import status
+
+        stream = io.StringIO()
+        with status("Initial", stream=stream, use_color=False) as s:
+            s.update("Updated")
+        # Should complete without error
+
+    def test_status_exception(self) -> None:
+        """Should show error on exception."""
+        from agentsh.utils.ux import status
+
+        stream = io.StringIO()
+        with pytest.raises(ValueError):
+            with status("Testing", stream=stream, use_color=False) as s:
+                raise ValueError("Test error")
+        # Should re-raise the exception
+
+
+class TestErrorContextComplete:
+    """Complete tests for ErrorContext."""
+
+    def test_error_context_all_fields(self) -> None:
+        """Should create context with all fields."""
+        ctx = ErrorContext(
+            error_type="TestError",
+            message="Test message",
+            details="Additional details",
+            suggestion="Try this fix",
+            help_url="https://example.com/help",
+        )
+        assert ctx.error_type == "TestError"
+        assert ctx.message == "Test message"
+        assert ctx.details == "Additional details"
+        assert ctx.suggestion == "Try this fix"
+        assert ctx.help_url == "https://example.com/help"
+
+
+class TestErrorFormatterComplete:
+    """Complete tests for ErrorFormatter."""
+
+    def test_format_with_all_fields(self) -> None:
+        """Should format error with all fields."""
+        formatter = ErrorFormatter(use_color=False)
+        ctx = ErrorContext(
+            error_type="TestError",
+            message="Test message",
+            details="Detailed info",
+            suggestion="Fix suggestion",
+            help_url="https://example.com",
+        )
+        output = formatter.format(ctx)
+        assert "TestError" in output
+        assert "Test message" in output
+        assert "Detailed info" in output
+        assert "Fix suggestion" in output
+        assert "https://example.com" in output
+
+    def test_format_minimal(self) -> None:
+        """Should format error with minimal fields."""
+        formatter = ErrorFormatter(use_color=False)
+        ctx = ErrorContext(
+            error_type="SimpleError",
+            message="Simple message",
+        )
+        output = formatter.format(ctx)
+        assert "SimpleError" in output
+        assert "Simple message" in output
+
+
+class TestSpinnerComplete:
+    """Complete tests for Spinner."""
+
+    def test_spinner_styles(self) -> None:
+        """Should support different spinner styles."""
+        for style in SpinnerStyle:
+            stream = io.StringIO()
+            spinner = Spinner("Test", style=style, stream=stream, use_color=False)
+            assert spinner.style == style
+
+    def test_spinner_custom_message(self) -> None:
+        """Should use custom success/error messages."""
+        stream = io.StringIO()
+        spinner = Spinner("Working", stream=stream, use_color=False)
+        spinner.start()
+        time.sleep(0.01)
+        spinner.stop("Custom done message")
+        # Should complete without error
+
+
+class TestProgressBarComplete:
+    """Complete tests for ProgressBar."""
+
+    def test_progress_bar_with_description(self) -> None:
+        """Should show description."""
+        stream = io.StringIO()
+        bar = ProgressBar(100, description="Loading", stream=stream, use_color=False)
+        bar.update(50)
+        output = stream.getvalue()
+        assert "Loading" in output or "50" in output
+
+    def test_progress_bar_complete(self) -> None:
+        """Should show 100% when complete."""
+        stream = io.StringIO()
+        bar = ProgressBar(100, stream=stream, use_color=False)
+        bar.update(100)
+        bar.finish()
+        output = stream.getvalue()
+        assert "100" in output or "█" in output
+
+    def test_progress_bar_zero_total(self) -> None:
+        """Should handle zero total gracefully."""
+        stream = io.StringIO()
+        bar = ProgressBar(0, stream=stream, use_color=False)
+        bar.update(0)
+        # Should not crash
+
+
+class TestTableComplete:
+    """Complete tests for Table."""
+
+    def test_table_column_alignment(self) -> None:
+        """Should support column alignment."""
+        columns = [
+            TableColumn("Left", "left", align="left"),
+            TableColumn("Right", "right", align="right"),
+            TableColumn("Center", "center", align="center"),
+        ]
+        table = Table(columns)
+        table.add_row({"left": "A", "right": "B", "center": "C"})
+        output = table.render()
+        assert "A" in output
+        assert "B" in output
+        assert "C" in output
+
+    def test_table_empty_rows(self) -> None:
+        """Should handle table with no rows."""
+        columns = [TableColumn("Col1", "col1"), TableColumn("Col2", "col2")]
+        table = Table(columns)
+        output = table.render()
+        assert "Col1" in output
+
+    def test_table_unicode_content(self) -> None:
+        """Should handle unicode content."""
+        columns = [TableColumn("Name", "name")]
+        table = Table(columns)
+        table.add_row({"name": "日本語"})
+        output = table.render()
+        assert "日本語" in output

@@ -313,6 +313,144 @@ class TestApprovalFlow:
         assert response.result == ApprovalResult.DENIED
 
 
+class TestRBACExtended:
+    """Extended RBAC tests for full coverage."""
+
+    def test_superuser_permissions(self):
+        """Test superuser role has maximum permissions."""
+        rbac = RBAC()
+        user = User(id="super", name="Superuser", role=Role.SUPERUSER)
+
+        # Superuser can execute at all levels except CRITICAL
+        allowed, needs_approval, _ = rbac.check_access(user, RiskLevel.SAFE)
+        assert allowed and not needs_approval
+
+        allowed, needs_approval, _ = rbac.check_access(user, RiskLevel.HIGH)
+        assert allowed and not needs_approval
+
+        # CRITICAL still needs approval even for superuser
+        allowed, needs_approval, _ = rbac.check_access(user, RiskLevel.CRITICAL)
+        assert not allowed and needs_approval
+
+    def test_device_role_override(self):
+        """Test per-device role override."""
+        user = User(
+            id="multi",
+            name="Multi Role",
+            role=Role.VIEWER,
+            device_roles={"device-1": Role.ADMIN, "device-2": Role.OPERATOR},
+        )
+
+        # Default role is VIEWER
+        assert user.get_role() == Role.VIEWER
+
+        # Device-specific roles
+        assert user.get_role("device-1") == Role.ADMIN
+        assert user.get_role("device-2") == Role.OPERATOR
+
+        # Unknown device uses default
+        assert user.get_role("device-3") == Role.VIEWER
+
+    def test_permission_helper_methods(self):
+        """Test RBAC permission helper methods."""
+        rbac = RBAC()
+
+        # can_execute
+        assert rbac.can_execute(Role.OPERATOR, RiskLevel.SAFE) is True
+        assert rbac.can_execute(Role.OPERATOR, RiskLevel.HIGH) is False
+
+        # can_approve
+        assert rbac.can_approve(Role.ADMIN, RiskLevel.HIGH) is True
+        assert rbac.can_approve(Role.OPERATOR, RiskLevel.HIGH) is False
+
+        # requires_approval
+        assert rbac.requires_approval(Role.OPERATOR, RiskLevel.MEDIUM) is True
+        assert rbac.requires_approval(Role.ADMIN, RiskLevel.MEDIUM) is False
+
+        # is_blocked
+        assert rbac.is_blocked(Role.VIEWER, RiskLevel.SAFE) is True
+        assert rbac.is_blocked(Role.ADMIN, RiskLevel.SAFE) is False
+
+    def test_user_registration_and_retrieval(self):
+        """Test user registration and retrieval."""
+        rbac = RBAC()
+        user = User(id="test_user", name="Test User", role=Role.OPERATOR)
+
+        # Register user
+        rbac.register_user(user)
+
+        # Retrieve registered user
+        retrieved = rbac.get_user("test_user")
+        assert retrieved is not None
+        assert retrieved.id == "test_user"
+
+        # Non-existent user returns None
+        assert rbac.get_user("nonexistent") is None
+
+    def test_get_current_user(self):
+        """Test getting current user from environment."""
+        import os
+        from unittest.mock import patch
+
+        rbac = RBAC()
+
+        # Test with USER environment variable
+        with patch.dict(os.environ, {"USER": "test_env_user"}, clear=False):
+            current = rbac.get_current_user()
+            assert current.id == "test_env_user"
+            assert current.role == Role.OPERATOR
+
+    def test_get_current_user_registered(self):
+        """Test getting current user when registered."""
+        import os
+        from unittest.mock import patch
+
+        rbac = RBAC()
+        user = User(id="known_user", name="Known", role=Role.ADMIN)
+        rbac.register_user(user)
+
+        with patch.dict(os.environ, {"USER": "known_user"}, clear=False):
+            current = rbac.get_current_user()
+            assert current.id == "known_user"
+            assert current.role == Role.ADMIN
+
+    def test_check_access_with_device(self):
+        """Test check_access with device override."""
+        rbac = RBAC()
+        user = User(
+            id="operator",
+            name="Operator",
+            role=Role.OPERATOR,
+            device_roles={"secure-device": Role.VIEWER},
+        )
+        rbac.register_user(user)
+
+        # Default role allows SAFE commands
+        allowed, _, _ = rbac.check_access(user, RiskLevel.SAFE)
+        assert allowed
+
+        # On secure-device, role is VIEWER which blocks SAFE commands
+        allowed, _, _ = rbac.check_access(user, RiskLevel.SAFE, device_id="secure-device")
+        assert not allowed
+
+    def test_role_hierarchy(self):
+        """Test role hierarchy comparisons."""
+        assert Role.VIEWER < Role.OPERATOR
+        assert Role.OPERATOR < Role.ADMIN
+        assert Role.ADMIN < Role.SUPERUSER
+
+    def test_permission_matrix_all_roles(self):
+        """Test permission matrix covers all role/risk combinations."""
+        rbac = RBAC()
+
+        for role in Role:
+            for risk in RiskLevel:
+                perm = rbac.get_permission(role, risk)
+                assert isinstance(perm.can_execute, bool)
+                assert isinstance(perm.can_approve, bool)
+                assert isinstance(perm.requires_approval, bool)
+
+
 class TestAuditLogger:
     """Tests for AuditLogger."""
 
@@ -391,6 +529,212 @@ class TestAuditLogger:
             assert len(events) == 3
             # Most recent first
             assert events[0].action == AuditAction.COMMAND_BLOCKED
+
+
+class TestAuditLoggerExtended:
+    """Extended tests for AuditLogger."""
+
+    def test_log_command_approved(self):
+        """Test logging command approval."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "audit.log"
+            audit_logger = AuditLogger(log_path=log_path)
+
+            audit_logger.log_command_approved(
+                command="rm -rf ./old_data",
+                approver="admin",
+                user="alice",
+                risk_level=RiskLevel.HIGH,
+            )
+
+            events = audit_logger.get_recent(n=1)
+            assert len(events) == 1
+            assert events[0].action == AuditAction.COMMAND_APPROVED
+            assert events[0].approver == "admin"
+
+    def test_log_command_denied(self):
+        """Test logging command denial."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "audit.log"
+            audit_logger = AuditLogger(log_path=log_path)
+
+            audit_logger.log_command_denied(
+                command="rm -rf /",
+                reason="Too dangerous",
+                risk_level=RiskLevel.CRITICAL,
+            )
+
+            events = audit_logger.get_recent(n=1)
+            assert events[0].action == AuditAction.COMMAND_DENIED
+            assert events[0].result == "Too dangerous"
+
+    def test_log_session_start_and_end(self):
+        """Test logging session events."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "audit.log"
+            audit_logger = AuditLogger(log_path=log_path)
+
+            audit_logger.log_session_start(metadata={"version": "1.0"})
+            audit_logger.log_session_end(metadata={"duration": 3600})
+
+            events = audit_logger.get_recent(n=2)
+            assert len(events) == 2
+            assert events[0].action == AuditAction.SESSION_END
+            assert events[1].action == AuditAction.SESSION_START
+
+    def test_log_security_violation(self):
+        """Test logging security violation."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "audit.log"
+            audit_logger = AuditLogger(log_path=log_path)
+
+            audit_logger.log_security_violation(
+                description="Attempted command injection",
+                command="; cat /etc/passwd",
+                user="malicious_user",
+                metadata={"ip": "192.168.1.100"},
+            )
+
+            events = audit_logger.get_recent(n=1)
+            assert events[0].action == AuditAction.SECURITY_VIOLATION
+            assert events[0].risk_level == RiskLevel.CRITICAL
+
+    def test_event_to_json(self):
+        """Test event JSON serialization."""
+        event = AuditEvent(
+            timestamp=datetime.now(),
+            action=AuditAction.TOOL_INVOKED,
+            user="alice",
+            command="shell.run",
+            metadata={"arg": "ls"},
+        )
+        json_str = event.to_json()
+        data = json.loads(json_str)
+        assert data["action"] == "tool_invoked"
+
+    def test_event_from_dict_minimal(self):
+        """Test creating event from minimal dict."""
+        data = {
+            "timestamp": datetime.now().isoformat(),
+            "action": "command_executed",
+            "user": "bob",
+            "command": "ls",
+        }
+        event = AuditEvent.from_dict(data)
+        assert event.action == AuditAction.COMMAND_EXECUTED
+        assert event.risk_level is None
+        assert event.approver is None
+
+    def test_event_with_all_optional_fields(self):
+        """Test event with all optional fields populated."""
+        event = AuditEvent(
+            timestamp=datetime.now(),
+            action=AuditAction.COMMAND_EXECUTED,
+            user="alice",
+            command="ls",
+            risk_level=RiskLevel.SAFE,
+            result="success",
+            approver="admin",
+            device_id="robot-01",
+            session_id="abc123",
+            metadata={"key": "value"},
+        )
+        d = event.to_dict()
+        assert d["risk_level"] == "SAFE"
+        assert d["result"] == "success"
+        assert d["approver"] == "admin"
+        assert d["device_id"] == "robot-01"
+        assert d["session_id"] == "abc123"
+        assert d["metadata"]["key"] == "value"
+
+    def test_get_by_user(self):
+        """Test getting events filtered by user."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "audit.log"
+            audit_logger = AuditLogger(log_path=log_path)
+
+            audit_logger.log_command_executed("ls", user="alice")
+            audit_logger.log_command_executed("pwd", user="bob")
+            audit_logger.log_command_executed("cd", user="alice")
+
+            alice_events = audit_logger.get_by_user("alice")
+            assert len(alice_events) == 2
+            for event in alice_events:
+                assert event.user == "alice"
+
+    def test_get_by_action(self):
+        """Test getting events filtered by action type."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "audit.log"
+            audit_logger = AuditLogger(log_path=log_path)
+
+            audit_logger.log_command_executed("ls")
+            audit_logger.log_command_blocked("rm -rf /", "Dangerous")
+            audit_logger.log_command_executed("pwd")
+
+            blocked = audit_logger.get_by_action(AuditAction.COMMAND_BLOCKED)
+            assert len(blocked) == 1
+            assert blocked[0].command == "rm -rf /"
+
+    def test_get_recent_empty_log(self):
+        """Test getting events from non-existent log."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "nonexistent.log"
+            audit_logger = AuditLogger(log_path=log_path)
+
+            events = audit_logger.get_recent()
+            assert events == []
+
+    def test_log_rotation(self):
+        """Test log file rotation."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "audit.log"
+            # Set very small max file size to trigger rotation
+            audit_logger = AuditLogger(log_path=log_path, max_file_size=100)
+
+            # Write enough to trigger rotation
+            for i in range(10):
+                audit_logger.log_command_executed(
+                    f"command_{i}" * 10,  # Make command long
+                    user="alice",
+                )
+
+            # Check that rotated file exists
+            rotated_files = list(Path(tmpdir).glob("audit.*.log"))
+            assert len(rotated_files) >= 1
+
+    def test_log_with_device_id(self):
+        """Test logging with device ID."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = Path(tmpdir) / "audit.log"
+            audit_logger = AuditLogger(log_path=log_path)
+
+            audit_logger.log_command_executed(
+                command="ros2 topic list",
+                user="operator",
+                risk_level=RiskLevel.LOW,
+                device_id="robot-01",
+            )
+
+            events = audit_logger.get_recent(n=1)
+            assert events[0].device_id == "robot-01"
+
+    def test_default_path(self):
+        """Test default audit log path."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            import agentsh.security.audit as audit_module
+
+            original_home = Path.home
+
+            try:
+                # Mock home directory
+                Path.home = lambda: Path(tmpdir)
+
+                audit_logger = AuditLogger()
+                expected_path = Path(tmpdir) / ".agentsh" / "audit.log"
+                assert audit_logger.log_path == expected_path
+            finally:
+                Path.home = original_home
 
 
 class TestSecurityController:

@@ -384,3 +384,362 @@ class TestEdgeCases:
         output = renderer.render("# 你好世界\n\nÉmoji: 🎉")
         assert "你好世界" in output
         assert "🎉" in output
+
+
+class TestMarkdownRendererExtended:
+    """Extended tests for MarkdownRenderer."""
+
+    def test_h4_h5_h6(self) -> None:
+        """Should render h4, h5, h6 headers."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+
+        h4 = renderer.render("#### Level 4")
+        assert "Level 4" in h4
+
+        h5 = renderer.render("##### Level 5")
+        assert "Level 5" in h5
+
+        h6 = renderer.render("###### Level 6")
+        assert "Level 6" in h6
+
+    def test_asterisk_list(self) -> None:
+        """Should render asterisk lists."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        md = """* Item 1
+* Item 2"""
+        output = renderer.render(md)
+        assert "Item 1" in output
+        assert "Item 2" in output
+
+    def test_plus_list(self) -> None:
+        """Should render plus sign lists."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        md = """+ Item 1
++ Item 2"""
+        output = renderer.render(md)
+        assert "Item 1" in output
+        assert "Item 2" in output
+
+    def test_code_block_with_language(self) -> None:
+        """Should preserve language hint."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        md = """```bash
+echo "hello"
+```"""
+        output = renderer.render(md)
+        assert "echo" in output
+
+    def test_inline_bold_italic_combined(self) -> None:
+        """Should handle combined bold and italic."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        output = renderer.render("This is ***bold italic***")
+        assert "bold italic" in output
+
+    def test_multiline_paragraph(self) -> None:
+        """Should handle multiline paragraphs."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        md = """This is the first line of a paragraph
+that continues on the second line.
+
+And this is a new paragraph."""
+        output = renderer.render(md)
+        assert "first line" in output
+        assert "new paragraph" in output
+
+    def test_multiple_headers_same_level(self) -> None:
+        """Should handle multiple headers at same level."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        md = """# Header 1
+
+Some text
+
+# Header 2"""
+        output = renderer.render(md)
+        assert "Header 1" in output
+        assert "Header 2" in output
+
+    def test_link_with_title(self) -> None:
+        """Should handle link with title attribute."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        output = renderer.render('[Link](https://example.com "Title")')
+        assert "Link" in output
+        assert "example.com" in output
+
+    def test_autolink(self) -> None:
+        """Should handle bare URLs."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        output = renderer.render("Visit https://example.com for more")
+        assert "https://example.com" in output
+
+    def test_escape_characters(self) -> None:
+        """Should handle escape characters."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        output = renderer.render("Not \\*bold\\* or \\`code\\`")
+        assert "*bold*" not in output or "\\*bold\\*" not in output
+
+    def test_very_long_line(self) -> None:
+        """Should handle very long lines."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False, max_width=40))
+        long_text = "A" * 100
+        output = renderer.render(long_text)
+        # Should not crash
+        assert "A" in output
+
+    def test_task_list(self) -> None:
+        """Should handle task lists."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        md = """- [ ] Unchecked
+- [x] Checked"""
+        output = renderer.render(md)
+        assert "Unchecked" in output or "☐" in output
+        assert "Checked" in output or "☑" in output
+
+    def test_simple_style(self) -> None:
+        """Should use simple style."""
+        config = RenderConfig(style=MarkdownStyle.SIMPLE, use_color=False)
+        renderer = MarkdownRenderer(config)
+
+        output = renderer.render("# Header\n\n**bold**")
+        assert "Header" in output
+        assert "bold" in output
+
+    def test_render_table_basic(self) -> None:
+        """Should render basic table."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        md = """| Col1 | Col2 |
+|------|------|
+| A    | B    |"""
+        output = renderer.render(md)
+        assert "Col1" in output
+        assert "A" in output
+
+    def test_deeply_nested_list(self) -> None:
+        """Should handle deeply nested lists."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        md = """- Level 1
+  - Level 2
+    - Level 3"""
+        output = renderer.render(md)
+        assert "Level 1" in output
+        assert "Level 2" in output
+        assert "Level 3" in output
+
+    def test_mixed_list_types(self) -> None:
+        """Should handle mixed ordered/unordered lists."""
+        renderer = MarkdownRenderer(RenderConfig(use_color=False))
+        md = """1. First
+2. Second
+   - Sub item A
+   - Sub item B"""
+        output = renderer.render(md)
+        assert "First" in output
+        assert "Sub item A" in output
+
+    def test_custom_bullet(self) -> None:
+        """Should use custom bullet character."""
+        config = RenderConfig(use_color=False, bullet_char="-")
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("- Item")
+        assert "Item" in output
+
+
+class TestMarkdownCodeBlockStyles:
+    """Tests for code block rendering styles."""
+
+    def test_code_block_plain_style(self) -> None:
+        """Should render plain code blocks."""
+        config = RenderConfig(use_color=False, code_block_style="plain")
+        renderer = MarkdownRenderer(config)
+        md = """```
+plain code
+```"""
+        output = renderer.render(md)
+        assert "plain code" in output
+
+    def test_code_block_no_color_box(self) -> None:
+        """Should render box style without color."""
+        config = RenderConfig(use_color=False, code_block_style="box")
+        renderer = MarkdownRenderer(config)
+        md = """```python
+box code
+```"""
+        output = renderer.render(md)
+        assert "box code" in output
+        assert "┌" in output
+        assert "┘" in output
+
+    def test_code_block_no_color_indent(self) -> None:
+        """Should render indent style without color."""
+        config = RenderConfig(use_color=False, code_block_style="indent")
+        renderer = MarkdownRenderer(config)
+        md = """```
+indent code
+```"""
+        output = renderer.render(md)
+        assert "indent code" in output
+        assert "    " in output  # Should be indented
+
+    def test_code_block_default_style(self) -> None:
+        """Should use default box style."""
+        config = RenderConfig(use_color=False)
+        renderer = MarkdownRenderer(config)
+        md = """```
+default
+```"""
+        output = renderer.render(md)
+        assert "default" in output
+
+
+class TestMarkdownHeaderLevels:
+    """Tests for different header levels with color."""
+
+    def test_h1_colored_uppercase(self) -> None:
+        """Should render h1 in uppercase with color."""
+        config = RenderConfig(use_color=True)
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("# Test Header")
+        assert "TEST HEADER" in output
+        assert Color.CYAN.value in output
+
+    def test_h2_colored(self) -> None:
+        """Should render h2 with color."""
+        config = RenderConfig(use_color=True)
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("## Level Two")
+        assert "Level Two" in output
+        assert Color.BLUE.value in output
+
+    def test_h3_colored(self) -> None:
+        """Should render h3 with green color."""
+        config = RenderConfig(use_color=True)
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("### Level Three")
+        assert "Level Three" in output
+        assert Color.GREEN.value in output
+
+    def test_h4_h5_h6_colored(self) -> None:
+        """Should render h4-h6 with bold."""
+        config = RenderConfig(use_color=True)
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("#### Level Four")
+        assert "Level Four" in output
+        assert Color.BOLD.value in output
+
+
+class TestMarkdownInlineFormatting:
+    """Tests for inline formatting with colors."""
+
+    def test_inline_code_colored(self) -> None:
+        """Should render inline code with yellow."""
+        config = RenderConfig(use_color=True)
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("Use `code` here")
+        assert Color.YELLOW.value in output
+
+    def test_link_colored(self) -> None:
+        """Should render links with blue and underline."""
+        config = RenderConfig(use_color=True)
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("[Click](https://example.com)")
+        assert Color.BLUE.value in output
+
+    def test_image_colored(self) -> None:
+        """Should render image placeholders."""
+        config = RenderConfig(use_color=True)
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("![Alt](image.png)")
+        assert "Image:" in output or "Alt" in output
+
+    def test_blockquote_colored(self) -> None:
+        """Should render blockquotes with dim color."""
+        config = RenderConfig(use_color=True)
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("> A quote")
+        assert "A quote" in output
+
+
+class TestMarkdownRestoreCodeBlocks:
+    """Tests for code block restoration."""
+
+    def test_multiple_code_blocks(self) -> None:
+        """Should handle multiple code blocks."""
+        config = RenderConfig(use_color=False)
+        renderer = MarkdownRenderer(config)
+        md = """```
+block 1
+```
+
+Some text
+
+```
+block 2
+```"""
+        output = renderer.render(md)
+        assert "block 1" in output
+        assert "block 2" in output
+        assert "Some text" in output
+
+    def test_code_block_with_special_chars(self) -> None:
+        """Should preserve special characters in code blocks."""
+        config = RenderConfig(use_color=False)
+        renderer = MarkdownRenderer(config)
+        md = """```
+<html>&amp;</html>
+**not bold**
+# not header
+```"""
+        output = renderer.render(md)
+        assert "<html>" in output
+        assert "**not bold**" in output
+        assert "# not header" in output
+
+
+class TestMarkdownMaxWidth:
+    """Tests for max width handling."""
+
+    def test_long_line_handling(self) -> None:
+        """Should handle very long lines."""
+        config = RenderConfig(use_color=False, max_width=40)
+        renderer = MarkdownRenderer(config)
+        long_text = "word " * 50
+        output = renderer.render(long_text)
+        # Should not crash
+        assert "word" in output
+
+    def test_width_affects_code_block(self) -> None:
+        """Max width should affect code block rendering."""
+        config = RenderConfig(use_color=False, max_width=60)
+        renderer = MarkdownRenderer(config)
+        md = """```
+short code
+```"""
+        output = renderer.render(md)
+        assert "short code" in output
+
+
+class TestMarkdownEmptyContent:
+    """Tests for empty/edge case content."""
+
+    def test_only_newlines(self) -> None:
+        """Should handle only newlines."""
+        config = RenderConfig(use_color=False)
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("\n\n\n")
+        assert output == ""
+
+    def test_single_header(self) -> None:
+        """Should handle single header with no content."""
+        config = RenderConfig(use_color=False)
+        renderer = MarkdownRenderer(config)
+        output = renderer.render("# ")
+        # Should handle gracefully
+        assert output is not None
+
+    def test_empty_code_block(self) -> None:
+        """Should handle empty code block."""
+        config = RenderConfig(use_color=False)
+        renderer = MarkdownRenderer(config)
+        md = """```
+```"""
+        output = renderer.render(md)
+        assert "┌" in output or output == "" or output.strip() == ""

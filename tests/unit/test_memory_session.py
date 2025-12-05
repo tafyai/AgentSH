@@ -244,3 +244,217 @@ class TestMultiSessionStore:
 
         assert multi_store.get("session-1") is not None
         assert multi_store.get("session-2") is None
+
+
+class TestSessionStoreSummarization:
+    """Tests for session summarization behavior."""
+
+    def test_maybe_summarize_triggers_after_threshold(self):
+        """Test that summarization triggers after threshold."""
+        config = SessionConfig(
+            summarize_after=10,
+            max_turns=50,
+        )
+        store = SessionStore(config)
+
+        # Add turns to trigger summarization
+        for i in range(15):
+            store.append_turn(Turn(
+                user_input=f"This is a longer user input number {i}",
+                agent_response=f"This is the agent response for input {i}",
+            ))
+
+        # Should have triggered summarization
+        # The summarized turns should be removed, replaced with summary
+        # After summarizing half (7 turns), we should have 8 remaining
+        assert store.turn_count < 15  # Some turns were summarized
+
+    def test_generate_turn_summary_with_topics(self):
+        """Test turn summary generation extracts topics."""
+        store = SessionStore()
+
+        # Manually test _generate_turn_summary
+        turns = [
+            Turn(
+                user_input="Please analyze the Python code structure.",
+                agent_response="Here's the analysis.",
+            ),
+            Turn(
+                user_input="Now check the JavaScript files.",
+                agent_response="Checking files.",
+            ),
+        ]
+
+        summary = store._generate_turn_summary(turns)
+        assert "Earlier" in summary
+        assert "conversation" in summary.lower() or "discussed" in summary.lower()
+
+    def test_generate_turn_summary_empty(self):
+        """Test turn summary with empty list."""
+        store = SessionStore()
+        summary = store._generate_turn_summary([])
+        assert summary == ""
+
+    def test_generate_turn_summary_short_inputs(self):
+        """Test turn summary with short inputs."""
+        store = SessionStore()
+        turns = [
+            Turn(
+                user_input="Hi",  # Too short to be included
+                agent_response="Hello",
+            ),
+            Turn(
+                user_input="Bye",  # Too short
+                agent_response="Goodbye",
+            ),
+        ]
+
+        summary = store._generate_turn_summary(turns)
+        # With short inputs, falls back to "Earlier conversation" format
+        assert "Earlier" in summary
+
+    def test_get_context_window_with_summaries(self):
+        """Test context window includes summaries."""
+        config = SessionConfig(
+            summarize_after=6,
+            max_turns=50,
+        )
+        store = SessionStore(config)
+
+        # Add enough turns to trigger summarization
+        for i in range(15):
+            store.append_turn(Turn(
+                user_input=f"This is user input number {i}",
+                agent_response=f"This is response number {i}",
+            ))
+
+        context = store.get_context_window()
+
+        # Should include both summary and recent turns
+        assert "Recent conversation" in context
+        # If summarization happened, should have summary
+        if store._summaries:
+            assert "Previous conversation summary" in context
+
+    def test_get_context_window_truncation(self):
+        """Test context window respects token limits."""
+        store = SessionStore()
+
+        # Add many long turns
+        for i in range(20):
+            long_text = f"This is a very long message {i}. " * 50
+            store.append_turn(Turn(
+                user_input=long_text,
+                agent_response=long_text,
+            ))
+
+        # Request a small context window (100 tokens = ~400 chars)
+        context = store.get_context_window(max_tokens=100)
+
+        # Should be truncated to around max_tokens * 4 characters
+        assert len(context) <= 500  # Some slack for finding complete turns
+
+    def test_context_window_truncation_finds_complete_turn(self):
+        """Test truncation finds a complete turn boundary."""
+        store = SessionStore()
+
+        # Add several turns
+        for i in range(5):
+            store.append_turn(Turn(
+                user_input=f"User message {i} " * 20,
+                agent_response=f"Response {i} " * 20,
+            ))
+
+        # Request very small context
+        context = store.get_context_window(max_tokens=50)
+
+        # Should start with "User:" after truncation
+        if "User:" in context:
+            assert context.index("User:") == 0 or context.startswith("Recent")
+
+
+class TestSessionStoreEdgeCases:
+    """Edge case tests for SessionStore."""
+
+    def test_get_recent_more_than_available(self):
+        """Test getting more turns than available."""
+        store = SessionStore()
+        store.append_turn(Turn(
+            user_input="Only one",
+            agent_response="Single response",
+        ))
+
+        recent = store.get_recent(100)
+        assert len(recent) == 1
+
+    def test_search_in_response(self):
+        """Test search finds matches in responses."""
+        store = SessionStore()
+        store.append_turn(Turn(
+            user_input="What time is it?",
+            agent_response="The current time is 3:00 PM",
+        ))
+
+        results = store.search("3:00 PM")
+        assert len(results) == 1
+
+    def test_search_case_insensitive(self):
+        """Test search is case insensitive."""
+        store = SessionStore()
+        store.append_turn(Turn(
+            user_input="UPPERCASE query",
+            agent_response="lowercase response",
+        ))
+
+        results = store.search("uppercase")
+        assert len(results) == 1
+
+        results = store.search("LOWERCASE")
+        assert len(results) == 1
+
+    def test_search_limit(self):
+        """Test search respects limit."""
+        store = SessionStore()
+
+        # Add multiple matching turns
+        for i in range(10):
+            store.append_turn(Turn(
+                user_input=f"Python question {i}",
+                agent_response=f"Answer {i}",
+            ))
+
+        results = store.search("Python", limit=3)
+        assert len(results) == 3
+
+    def test_summarize_with_topics(self):
+        """Test summary includes topics from longer words."""
+        store = SessionStore()
+        store.append_turn(Turn(
+            user_input="kubernetes deployment strategy",
+            agent_response="Here's the deployment plan",
+            tools_used=["kubectl.apply"],
+            success=True,
+        ))
+
+        summary = store.summarize()
+        assert "kubernetes" in summary or "Topics discussed:" in summary
+
+    def test_summarize_tools_list(self):
+        """Test summary lists unique tools."""
+        store = SessionStore()
+        store.append_turn(Turn(
+            user_input="Read file",
+            agent_response="Contents",
+            tools_used=["fs.read"],
+            success=True,
+        ))
+        store.append_turn(Turn(
+            user_input="Read another",
+            agent_response="More contents",
+            tools_used=["fs.read"],  # Same tool
+            success=True,
+        ))
+
+        summary = store.summarize()
+        # Should only list unique tools
+        assert summary.count("fs.read") == 1

@@ -295,3 +295,189 @@ class TestShellWrapperHelpers:
 
         calls = [str(call) for call in mock_print.call_args_list]
         assert any("Phase 2" in str(call) for call in calls)
+
+    def test_show_status(self, wrapper: ShellWrapper) -> None:
+        """Test status display."""
+        from agentsh.telemetry.health import HealthChecker, HealthResult, HealthStatus
+
+        with patch("builtins.print") as mock_print:
+            with patch.object(HealthChecker, "check_all") as mock_check:
+                mock_check.return_value = {
+                    "test": HealthResult(
+                        healthy=True,
+                        status=HealthStatus.HEALTHY,
+                        message="All good",
+                    ),
+                }
+                wrapper._show_status()
+
+        calls = [str(call) for call in mock_print.call_args_list]
+        assert any("Status" in str(call) for call in calls)
+
+
+class TestShellWrapperMemoryCommands:
+    """Test cases for memory-related commands."""
+
+    @pytest.fixture
+    def config(self) -> AgentSHConfig:
+        """Create a test configuration."""
+        return AgentSHConfig()
+
+    @pytest.fixture
+    def wrapper(self, config: AgentSHConfig) -> ShellWrapper:
+        """Create a shell wrapper for testing."""
+        return ShellWrapper(config)
+
+    def test_handle_remember_without_args(self, wrapper: ShellWrapper) -> None:
+        """Test :remember without arguments shows usage."""
+        with patch("builtins.print") as mock_print:
+            wrapper._handle_remember([])
+
+        calls = [str(call) for call in mock_print.call_args_list]
+        assert any("Usage" in str(call) for call in calls)
+
+    def test_handle_remember_with_content(self, wrapper: ShellWrapper) -> None:
+        """Test :remember with content stores a note."""
+        with patch("agentsh.shell.wrapper.get_memory_store") as mock_get_store:
+            mock_store = MagicMock()
+            mock_store.remember.return_value = 123
+            mock_get_store.return_value = mock_store
+
+            with patch("builtins.print") as mock_print:
+                wrapper._handle_remember(["test", "note", "content"])
+
+            mock_store.remember.assert_called_once_with("test note content")
+            calls = [str(call) for call in mock_print.call_args_list]
+            assert any("Remembered" in str(call) for call in calls)
+
+    def test_handle_recall_without_query(self, wrapper: ShellWrapper) -> None:
+        """Test :recall without query shows all memories."""
+        with patch("agentsh.shell.wrapper.get_memory_store") as mock_get_store:
+            mock_store = MagicMock()
+            mock_store.recall.return_value = []
+            mock_get_store.return_value = mock_store
+
+            with patch("builtins.print"):
+                with patch("agentsh.shell.wrapper.format_memory_list") as mock_format:
+                    mock_format.return_value = "No memories"
+                    wrapper._handle_recall([])
+
+            mock_store.recall.assert_called_once_with(None, limit=10)
+
+    def test_handle_recall_with_query(self, wrapper: ShellWrapper) -> None:
+        """Test :recall with query searches memories."""
+        with patch("agentsh.shell.wrapper.get_memory_store") as mock_get_store:
+            mock_store = MagicMock()
+            mock_store.recall.return_value = []
+            mock_get_store.return_value = mock_store
+
+            with patch("builtins.print"):
+                with patch("agentsh.shell.wrapper.format_memory_list") as mock_format:
+                    mock_format.return_value = "Results"
+                    wrapper._handle_recall(["deploy", "friday"])
+
+            mock_store.recall.assert_called_once_with("deploy friday", limit=10)
+
+    def test_handle_forget_without_args(self, wrapper: ShellWrapper) -> None:
+        """Test :forget without ID shows usage."""
+        with patch("builtins.print") as mock_print:
+            wrapper._handle_forget([])
+
+        calls = [str(call) for call in mock_print.call_args_list]
+        assert any("Usage" in str(call) for call in calls)
+
+    def test_handle_forget_with_invalid_id(self, wrapper: ShellWrapper) -> None:
+        """Test :forget with invalid ID shows error."""
+        with patch("builtins.print") as mock_print:
+            wrapper._handle_forget(["not_a_number"])
+
+        calls = [str(call) for call in mock_print.call_args_list]
+        assert any("Invalid ID" in str(call) for call in calls)
+
+    def test_handle_forget_with_valid_id_found(self, wrapper: ShellWrapper) -> None:
+        """Test :forget with valid ID that exists."""
+        with patch("agentsh.shell.wrapper.get_memory_store") as mock_get_store:
+            mock_store = MagicMock()
+            mock_store.forget.return_value = True
+            mock_get_store.return_value = mock_store
+
+            with patch("builtins.print") as mock_print:
+                wrapper._handle_forget(["42"])
+
+            mock_store.forget.assert_called_once_with(42)
+            calls = [str(call) for call in mock_print.call_args_list]
+            assert any("Forgot memory" in str(call) for call in calls)
+
+    def test_handle_forget_with_valid_id_not_found(self, wrapper: ShellWrapper) -> None:
+        """Test :forget with valid ID that doesn't exist."""
+        with patch("agentsh.shell.wrapper.get_memory_store") as mock_get_store:
+            mock_store = MagicMock()
+            mock_store.forget.return_value = False
+            mock_get_store.return_value = mock_store
+
+            with patch("builtins.print") as mock_print:
+                wrapper._handle_forget(["99"])
+
+            calls = [str(call) for call in mock_print.call_args_list]
+            assert any("not found" in str(call) for call in calls)
+
+
+class TestShellWrapperSpecialCommands:
+    """Test cases for remaining special commands."""
+
+    @pytest.fixture
+    def config(self) -> AgentSHConfig:
+        """Create a test configuration."""
+        return AgentSHConfig()
+
+    @pytest.fixture
+    def wrapper(self, config: AgentSHConfig) -> ShellWrapper:
+        """Create a shell wrapper for testing."""
+        return ShellWrapper(config)
+
+    def test_process_remember_command(self, wrapper: ShellWrapper) -> None:
+        """Test processing :remember command."""
+        with patch.object(wrapper, "_handle_remember") as mock_remember:
+            wrapper._process_input(":remember test note")
+            mock_remember.assert_called_once()
+
+    def test_process_recall_command(self, wrapper: ShellWrapper) -> None:
+        """Test processing :recall command."""
+        with patch.object(wrapper, "_handle_recall") as mock_recall:
+            wrapper._process_input(":recall")
+            mock_recall.assert_called_once()
+
+    def test_process_forget_command(self, wrapper: ShellWrapper) -> None:
+        """Test processing :forget command."""
+        with patch.object(wrapper, "_handle_forget") as mock_forget:
+            wrapper._process_input(":forget 123")
+            mock_forget.assert_called_once()
+
+    def test_process_clear_command(self, wrapper: ShellWrapper) -> None:
+        """Test processing :clear command."""
+        with patch("os.system") as mock_system:
+            wrapper._process_input(":clear")
+            mock_system.assert_called_once()
+
+    def test_process_q_command(self, wrapper: ShellWrapper) -> None:
+        """Test processing :q command."""
+        wrapper._running = True
+        with patch("builtins.print"):
+            wrapper._process_input(":q")
+        assert wrapper._running is False
+
+    def test_process_h_command(self, wrapper: ShellWrapper) -> None:
+        """Test processing :h command (help alias)."""
+        with patch("agentsh.shell.wrapper.show_help") as mock_help:
+            mock_help.return_value = "Help"
+            with patch("builtins.print"):
+                wrapper._process_input(":h")
+            mock_help.assert_called_once()
+
+    def test_process_help_with_topic(self, wrapper: ShellWrapper) -> None:
+        """Test processing :help with a topic."""
+        with patch("agentsh.shell.wrapper.show_help") as mock_help:
+            mock_help.return_value = "Help for tools"
+            with patch("builtins.print"):
+                wrapper._process_input(":help tools")
+            mock_help.assert_called_once_with("tools")
