@@ -1841,6 +1841,287 @@ Generate completion scripts for shell installations where AgentSH is NOT the she
 
 ---
 
+## Phase 13: Docker, Kubernetes & CI/CD
+
+**Goal**: Production-ready containerization, orchestration, and automation
+**Estimated Effort**: 2-3 weeks
+**Dependencies**: Phase 12
+
+### 13.1 Docker Development Containers
+
+Development-focused containers for testing and experimentation.
+
+- [ ] Create `docker/dev/`:
+  - [ ] `Dockerfile.dev` - Full development environment:
+    - [ ] Python dev tools (pytest, black, ruff, mypy)
+    - [ ] Pre-configured with sample .agentshrc
+    - [ ] Volume mounts for live code reloading
+    - [ ] Non-root user with sudo access
+  - [ ] `Dockerfile.test` - CI test runner:
+    - [ ] Minimal image for running test suite
+    - [ ] All test dependencies installed
+    - [ ] Entrypoint runs pytest
+  - [ ] `docker-compose.dev.yml`:
+    - [ ] AgentSH dev container
+    - [ ] Ollama service for local LLM
+    - [ ] Redis for caching (optional)
+    - [ ] Hot reload on code changes
+
+- [ ] Scenario testing containers:
+  - [ ] `Dockerfile.ubuntu` - Ubuntu 22.04/24.04 test environment
+  - [ ] `Dockerfile.debian` - Debian 12 test environment
+  - [ ] `Dockerfile.fedora` - Fedora 39/40 test environment
+  - [ ] `Dockerfile.alpine` - Alpine 3.19 minimal test environment
+  - [ ] `Dockerfile.arch` - Arch Linux test environment
+  - [ ] Matrix testing script for all distros
+
+### 13.2 Production Docker Images
+
+Optimized images for production deployment.
+
+- [ ] Create `docker/prod/`:
+  - [ ] `Dockerfile` - Production image:
+    - [ ] Multi-stage build for minimal size
+    - [ ] Non-root user (agentsh:agentsh)
+    - [ ] Health check endpoint
+    - [ ] Signal handling (SIGTERM graceful shutdown)
+    - [ ] Read-only root filesystem support
+  - [ ] `Dockerfile.slim` - Minimal production image:
+    - [ ] Alpine-based (~50MB)
+    - [ ] Only essential dependencies
+    - [ ] No dev tools
+  - [ ] `Dockerfile.gpu` - GPU-enabled image:
+    - [ ] CUDA support for local LLM inference
+    - [ ] nvidia-container-toolkit compatible
+    - [ ] Ollama pre-installed
+
+- [ ] Container registry setup:
+  - [ ] GitHub Container Registry (ghcr.io)
+  - [ ] Docker Hub (optional)
+  - [ ] Automated builds on release tags
+  - [ ] Multi-arch builds (amd64, arm64)
+  - [ ] Semantic versioning tags (latest, v1, v1.0, v1.0.0)
+
+### 13.3 Kubernetes Deployment
+
+Deploy AgentSH as a managed service in Kubernetes clusters.
+
+- [ ] Create `k8s/` directory:
+  - [ ] `namespace.yaml` - agentsh namespace
+  - [ ] `deployment.yaml` - AgentSH deployment:
+    - [ ] Replica configuration
+    - [ ] Resource limits (CPU, memory)
+    - [ ] Liveness/readiness probes
+    - [ ] Security context (non-root, read-only fs)
+  - [ ] `service.yaml` - ClusterIP/LoadBalancer service
+  - [ ] `configmap.yaml` - Configuration:
+    - [ ] agentsh.yaml configuration
+    - [ ] Environment-specific settings
+  - [ ] `secret.yaml` - API keys (template):
+    - [ ] ANTHROPIC_API_KEY
+    - [ ] OPENAI_API_KEY
+    - [ ] External secrets operator support
+
+- [ ] Advanced Kubernetes features:
+  - [ ] `hpa.yaml` - Horizontal Pod Autoscaler
+  - [ ] `pdb.yaml` - Pod Disruption Budget
+  - [ ] `networkpolicy.yaml` - Network isolation
+  - [ ] `serviceaccount.yaml` - RBAC configuration
+  - [ ] `ingress.yaml` - Ingress/Gateway API
+
+- [ ] Helm chart:
+  - [ ] `charts/agentsh/Chart.yaml`
+  - [ ] `charts/agentsh/values.yaml` - Default values
+  - [ ] `charts/agentsh/templates/` - All K8s manifests
+  - [ ] `charts/agentsh/README.md` - Chart documentation
+  - [ ] Support for Ollama sidecar
+  - [ ] Configurable providers via values
+
+### 13.4 Remote Agent Control
+
+Send commands to AgentSH containers remotely.
+
+- [ ] Create `src/agentsh/remote/`:
+  - [ ] `client.py` - Remote AgentSH client:
+    - [ ] `AgentSHClient` class
+    - [ ] Connect to remote AgentSH instance
+    - [ ] Execute commands via MCP/API
+    - [ ] Stream output back
+  - [ ] `server.py` - Remote control server:
+    - [ ] WebSocket/gRPC interface
+    - [ ] Authentication (API key, mTLS)
+    - [ ] Session management
+    - [ ] Command queuing
+
+- [ ] CLI remote commands:
+  - [ ] `agentsh remote connect <host>` - Connect to remote instance
+  - [ ] `agentsh remote exec <host> "<command>"` - Execute single command
+  - [ ] `agentsh remote list` - List connected agents
+  - [ ] `agentsh remote logs <host>` - Stream logs
+
+- [ ] Kubernetes operator (future):
+  - [ ] `AgentSH` CRD for declarative agent management
+  - [ ] Auto-scaling based on command queue
+  - [ ] Self-healing and restart policies
+
+### 13.5 CI/CD Pipelines
+
+Comprehensive automation for testing, building, and releasing.
+
+- [ ] GitHub Actions workflows:
+  - [ ] `.github/workflows/ci.yml` - Main CI pipeline:
+    - [ ] Trigger on push/PR to main
+    - [ ] Matrix testing (Python 3.10, 3.11, 3.12)
+    - [ ] Lint (black, ruff, isort)
+    - [ ] Type check (mypy)
+    - [ ] Unit tests with coverage
+    - [ ] Integration tests
+    - [ ] Security scan (bandit, safety)
+  - [ ] `.github/workflows/docker.yml` - Docker builds:
+    - [ ] Build on tag push
+    - [ ] Multi-arch (amd64, arm64)
+    - [ ] Push to ghcr.io
+    - [ ] Scan with Trivy
+  - [ ] `.github/workflows/release.yml` - Release automation:
+    - [ ] Trigger on version tag (v*)
+    - [ ] Build wheel and sdist
+    - [ ] Publish to PyPI
+    - [ ] Create GitHub release
+    - [ ] Generate changelog
+  - [ ] `.github/workflows/docs.yml` - Documentation:
+    - [ ] Build docs on push
+    - [ ] Deploy to GitHub Pages
+    - [ ] API reference generation
+
+- [ ] Quality gates:
+  - [ ] Required status checks
+  - [ ] Minimum 80% code coverage
+  - [ ] No high/critical security issues
+  - [ ] All tests passing
+  - [ ] Type check passing
+
+- [ ] Pre-commit hooks:
+  - [ ] `.pre-commit-config.yaml`:
+    - [ ] black formatting
+    - [ ] ruff linting
+    - [ ] isort imports
+    - [ ] mypy type checking
+    - [ ] Trailing whitespace
+    - [ ] YAML/JSON validation
+
+### 13.6 Getting Started & Examples
+
+Comprehensive onboarding documentation and examples.
+
+- [ ] Create `docs/getting-started/`:
+  - [ ] `README.md` - Quick start guide
+  - [ ] `installation.md` - Detailed installation
+  - [ ] `first-steps.md` - First commands tutorial
+  - [ ] `configuration.md` - Configuration guide
+  - [ ] `providers.md` - LLM provider setup
+
+- [ ] Create `examples/`:
+  - [ ] `examples/README.md` - Examples index
+  - [ ] `examples/basic/`:
+    - [ ] `hello-world.md` - First AgentSH session
+    - [ ] `file-operations.md` - File manipulation
+    - [ ] `git-workflow.md` - Git operations
+  - [ ] `examples/docker/`:
+    - [ ] `local-dev.md` - Local development setup
+    - [ ] `testing-scenarios.md` - Testing in containers
+    - [ ] `multi-container.md` - Docker Compose setups
+  - [ ] `examples/kubernetes/`:
+    - [ ] `minikube-quickstart.md` - Local K8s testing
+    - [ ] `production-deployment.md` - Production setup
+    - [ ] `helm-installation.md` - Helm chart usage
+  - [ ] `examples/robotics/`:
+    - [ ] `ros2-integration.md` - ROS2 setup
+    - [ ] `fleet-management.md` - Multi-robot control
+  - [ ] `examples/automation/`:
+    - [ ] `ci-cd-agent.md` - CI/CD automation
+    - [ ] `monitoring-agent.md` - System monitoring
+    - [ ] `deployment-agent.md` - Automated deployments
+
+### 13.7 Makefile & Developer Experience
+
+Simplified development commands.
+
+- [ ] Create/update `Makefile`:
+  - [ ] Installation targets:
+    - [ ] `make install` - Install package
+    - [ ] `make install-dev` - Install with dev dependencies
+    - [ ] `make install-all` - Install all optional dependencies
+  - [ ] Testing targets:
+    - [ ] `make test` - Run all tests
+    - [ ] `make test-unit` - Unit tests only
+    - [ ] `make test-integration` - Integration tests
+    - [ ] `make test-coverage` - Tests with coverage report
+  - [ ] Linting targets:
+    - [ ] `make lint` - Run all linters
+    - [ ] `make format` - Auto-format code
+    - [ ] `make typecheck` - Run mypy
+  - [ ] Docker targets:
+    - [ ] `make docker-build` - Build production image
+    - [ ] `make docker-build-dev` - Build dev image
+    - [ ] `make docker-run` - Run container
+    - [ ] `make docker-test` - Run tests in container
+    - [ ] `make docker-push` - Push to registry
+  - [ ] Kubernetes targets:
+    - [ ] `make k8s-deploy` - Deploy to current context
+    - [ ] `make k8s-delete` - Remove deployment
+    - [ ] `make helm-install` - Install via Helm
+    - [ ] `make helm-upgrade` - Upgrade release
+  - [ ] Release targets:
+    - [ ] `make release` - Full release workflow
+    - [ ] `make changelog` - Generate changelog
+    - [ ] `make version-bump` - Bump version
+
+### 13.8 Release Documentation
+
+Documentation for releases and versioning.
+
+- [ ] Create `docs/releases/`:
+  - [ ] `CHANGELOG.md` - Version history
+  - [ ] `RELEASE_PROCESS.md` - How to release
+  - [ ] `VERSIONING.md` - Semantic versioning policy
+  - [ ] `MIGRATION.md` - Breaking changes migration guides
+
+- [ ] Release automation:
+  - [ ] Automatic changelog generation from commits
+  - [ ] GitHub release notes template
+  - [ ] Version bump script
+  - [ ] Pre-release (alpha, beta, rc) support
+
+### Phase 13 Tests
+
+- [ ] `tests/integration/test_docker.py`:
+  - [ ] Test container builds
+  - [ ] Test container starts and responds
+  - [ ] Test volume mounts work
+  - [ ] Test environment variable injection
+- [ ] `tests/integration/test_remote.py`:
+  - [ ] Test remote client connection
+  - [ ] Test command execution
+  - [ ] Test output streaming
+- [ ] `tests/e2e/test_k8s.py`:
+  - [ ] Test deployment in kind/minikube
+  - [ ] Test service connectivity
+  - [ ] Test scaling behavior
+
+### Phase 13 Deliverables
+
+- [ ] Development Docker containers for all major distros
+- [ ] Production-ready Docker images (standard, slim, GPU)
+- [ ] Multi-arch builds (amd64, arm64)
+- [ ] Kubernetes manifests and Helm chart
+- [ ] Remote agent control (connect, exec, logs)
+- [ ] GitHub Actions CI/CD pipelines
+- [ ] Comprehensive Makefile
+- [ ] Getting started guide and examples
+- [ ] Release documentation and automation
+
+---
+
 ## Appendix A: File Checklist by Package
 
 ### Shell Package (`src/agentsh/shell/`)
@@ -2051,42 +2332,144 @@ Generate completion scripts for shell installations where AgentSH is NOT the she
 ## Appendix C: Documentation Checklist
 
 ### User Documentation
-- [ ] `README.md` - Quick start
-- [ ] `docs/INSTALLATION.md`
-- [ ] `docs/CONFIGURATION.md`
-- [ ] `docs/USAGE.md`
-- [ ] `docs/COMMANDS.md`
+- [ ] `README.md` - Quick start with badges and screenshots
+- [ ] `docs/INSTALLATION.md` - All installation methods
+- [ ] `docs/CONFIGURATION.md` - Configuration reference
+- [ ] `docs/USAGE.md` - Usage patterns and examples
+- [ ] `docs/COMMANDS.md` - Command reference
+- [ ] `docs/PROVIDERS.md` - LLM provider setup guide
+
+### Getting Started Guide
+- [ ] `docs/getting-started/README.md` - Quick start overview
+- [ ] `docs/getting-started/installation.md` - Step-by-step install
+- [ ] `docs/getting-started/first-steps.md` - First session tutorial
+- [ ] `docs/getting-started/configuration.md` - Basic configuration
+- [ ] `docs/getting-started/providers.md` - Connecting to LLMs
 
 ### Developer Documentation
 - [ ] `docs/ARCHITECTURE.md` (exists)
-- [ ] `docs/PLUGIN_GUIDE.md`
-- [ ] `docs/WORKFLOW_GUIDE.md`
-- [ ] `docs/API_REFERENCE.md`
-- [ ] `docs/CONTRIBUTING.md`
+- [ ] `docs/PLUGIN_GUIDE.md` - Writing plugins
+- [ ] `docs/WORKFLOW_GUIDE.md` - LangGraph workflows
+- [ ] `docs/API_REFERENCE.md` - Python API docs
+- [ ] `docs/CONTRIBUTING.md` - Contribution guide
+- [ ] `docs/TESTING.md` - Testing guide and patterns
 
 ### Operations Documentation
-- [ ] `docs/DEPLOYMENT.md`
-- [ ] `docs/MONITORING.md`
-- [ ] `docs/TROUBLESHOOTING.md`
-- [ ] `docs/SECURITY.md`
+- [ ] `docs/DEPLOYMENT.md` - Deployment strategies
+- [ ] `docs/DOCKER.md` - Docker usage guide
+- [ ] `docs/KUBERNETES.md` - K8s deployment guide
+- [ ] `docs/MONITORING.md` - Metrics and observability
+- [ ] `docs/TROUBLESHOOTING.md` - Common issues
+- [ ] `docs/SECURITY.md` - Security considerations
+
+### Examples Documentation
+- [ ] `examples/README.md` - Examples index
+- [ ] `examples/basic/` - Basic usage examples
+- [ ] `examples/docker/` - Docker examples
+- [ ] `examples/kubernetes/` - K8s examples
+- [ ] `examples/robotics/` - Robotics/ROS2 examples
+- [ ] `examples/automation/` - Automation examples
 
 ---
 
 ## Appendix D: CI/CD Checklist
 
-### GitHub Actions
-- [ ] `.github/workflows/lint.yml`
-- [ ] `.github/workflows/test.yml`
-- [ ] `.github/workflows/security.yml`
-- [ ] `.github/workflows/release.yml`
+### GitHub Actions Workflows
+- [ ] `.github/workflows/ci.yml` - Main CI pipeline:
+  - [ ] Lint (black, ruff, isort)
+  - [ ] Type check (mypy)
+  - [ ] Unit tests (matrix: Python 3.10, 3.11, 3.12)
+  - [ ] Integration tests
+  - [ ] Coverage reporting (Codecov)
+- [ ] `.github/workflows/docker.yml` - Docker builds:
+  - [ ] Build on push to main
+  - [ ] Build on version tags
+  - [ ] Multi-arch (amd64, arm64)
+  - [ ] Push to ghcr.io
+  - [ ] Trivy security scan
+- [ ] `.github/workflows/release.yml` - Release automation:
+  - [ ] Trigger on version tag (v*)
+  - [ ] Build wheel and sdist
+  - [ ] Publish to PyPI
+  - [ ] Create GitHub release
+  - [ ] Generate changelog
+- [ ] `.github/workflows/docs.yml` - Documentation:
+  - [ ] Build docs on push
+  - [ ] Deploy to GitHub Pages
+  - [ ] API reference generation
 
 ### Quality Gates
-- [ ] Lint passes (black, ruff)
-- [ ] Type check passes (mypy)
-- [ ] Unit tests pass
+- [ ] Lint passes (black, ruff, isort)
+- [ ] Type check passes (mypy --strict)
+- [ ] Unit tests pass (pytest)
 - [ ] Integration tests pass
-- [ ] Security scan passes
+- [ ] Security scan passes (bandit, safety)
 - [ ] Coverage >= 80%
+- [ ] No high/critical vulnerabilities
+
+### Pre-commit Configuration
+- [ ] `.pre-commit-config.yaml`:
+  - [ ] black - code formatting
+  - [ ] ruff - fast linting
+  - [ ] isort - import sorting
+  - [ ] mypy - type checking
+  - [ ] trailing-whitespace - cleanup
+  - [ ] end-of-file-fixer - newlines
+  - [ ] check-yaml - YAML validation
+  - [ ] check-json - JSON validation
+  - [ ] detect-private-key - security
+
+### Container Registry
+- [ ] GitHub Container Registry (ghcr.io/org/agentsh)
+- [ ] Automated builds on release
+- [ ] Multi-arch manifests
+- [ ] Semantic version tags (latest, v1, v1.0, v1.0.0)
+- [ ] Vulnerability scanning
+
+### Release Process
+- [ ] Version bump script
+- [ ] Changelog generation (conventional commits)
+- [ ] GitHub release notes template
+- [ ] PyPI publishing automation
+- [ ] Docker image publishing
+- [ ] Helm chart versioning
+
+---
+
+## Appendix E: Makefile Targets
+
+### Installation
+- [ ] `make install` - Install package
+- [ ] `make install-dev` - Install with dev dependencies
+- [ ] `make install-all` - Install all optional dependencies
+
+### Development
+- [ ] `make test` - Run all tests
+- [ ] `make test-unit` - Unit tests only
+- [ ] `make test-integration` - Integration tests
+- [ ] `make test-coverage` - Tests with coverage
+- [ ] `make lint` - Run all linters
+- [ ] `make format` - Auto-format code
+- [ ] `make typecheck` - Run mypy
+
+### Docker
+- [ ] `make docker-build` - Build production image
+- [ ] `make docker-build-dev` - Build dev image
+- [ ] `make docker-run` - Run container
+- [ ] `make docker-test` - Run tests in container
+- [ ] `make docker-push` - Push to registry
+
+### Kubernetes
+- [ ] `make k8s-deploy` - Deploy to cluster
+- [ ] `make k8s-delete` - Remove deployment
+- [ ] `make helm-install` - Install via Helm
+- [ ] `make helm-upgrade` - Upgrade release
+
+### Release
+- [ ] `make release` - Full release workflow
+- [ ] `make changelog` - Generate changelog
+- [ ] `make version-bump` - Bump version
+- [ ] `make publish` - Publish to PyPI
 
 ---
 
@@ -2100,6 +2483,8 @@ Generate completion scripts for shell installations where AgentSH is NOT the she
 | Dec 2025 | 1.3 | Added tab completion (shell/completer.py), resource manager (utils/resource_manager.py); 1224 tests passing |
 | Dec 2025 | 1.4 | Added Ollama, LiteLLM, OpenRouter providers; 2265 tests passing |
 | Dec 2025 | 1.5 | Phase 12 (Installation & Distribution) complete: universal installer, Homebrew, Debian, RPM, Arch, Alpine, Docker, Windows |
+| Dec 2025 | 1.6 | Phase 11 (Shell Completion & Login Shell Support) complete: hybrid completions, login shell, session management; 2379 tests |
+| Dec 2025 | 1.7 | Added Phase 13 (Docker, Kubernetes & CI/CD): containers, K8s, remote control, CI/CD, examples, Makefile |
 
 ---
 
