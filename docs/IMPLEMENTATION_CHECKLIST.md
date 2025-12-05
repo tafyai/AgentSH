@@ -1536,179 +1536,183 @@
 **Goal**: Full shell completion integration and login shell compatibility
 **Estimated Effort**: 1-2 weeks
 **Dependencies**: Phase 1, Phase 10
+**Status**: Complete
 
 ### 11.1 Hybrid Shell Completion
 
 Implement configurable tab completion that integrates with the underlying shell.
 
-- [ ] Create `shell/completion_modes.py`:
-  - [ ] `CompletionMode` enum:
-    - [ ] `NATIVE` - Only AgentSH completions (current behavior)
-    - [ ] `PASSTHROUGH` - Full PTY passthrough for completions
-    - [ ] `HYBRID` - Merge AgentSH + shell completions (default)
-  - [ ] `ShellCompletionProxy` class:
-    - [ ] `query_shell_completions(partial: str) -> list[str]`
-    - [ ] Support for bash (`compgen`)
-    - [ ] Support for zsh (completion system)
-    - [ ] Support for fish (fish_complete)
-    - [ ] Timeout handling for slow completions
+- [x] Create `shell/completion_modes.py`:
+  - [x] `CompletionMode` enum:
+    - [x] `NATIVE` - Only AgentSH completions (current behavior)
+    - [x] `PASSTHROUGH` - Full PTY passthrough for completions
+    - [x] `HYBRID` - Merge AgentSH + shell completions (default)
+  - [x] `ShellCompletionProxy` class:
+    - [x] `query_shell_completions(partial: str) -> list[str]`
+    - [x] Support for bash (`compgen`)
+    - [x] Support for zsh (completion system)
+    - [x] Support for fish (fish_complete)
+    - [x] Timeout handling for slow completions
 
-- [ ] Update `shell/completer.py`:
-  - [ ] Add `completion_mode` configuration option
-  - [ ] Implement `_complete_shell_command(text: str) -> list[str]`:
-    - [ ] Query underlying shell for command completions
-    - [ ] Parse shell completion output
-    - [ ] Handle executable path completion
-    - [ ] Handle argument completion (flags, options)
-  - [ ] Merge shell completions with AgentSH completions in hybrid mode
-  - [ ] Prioritization: AgentSH special commands > tools > shell completions
-  - [ ] Deduplication of merged completions
+- [x] Update `shell/completer.py`:
+  - [x] Add `completion_mode` configuration option
+  - [x] Implement `_complete_shell_command(text: str) -> list[str]`:
+    - [x] Query underlying shell for command completions
+    - [x] Parse shell completion output
+    - [x] Handle executable path completion
+    - [x] Handle argument completion (flags, options)
+  - [x] Merge shell completions with AgentSH completions in hybrid mode
+  - [x] Prioritization: AgentSH special commands > tools > shell completions
+  - [x] Deduplication of merged completions
 
-- [ ] Update `config/schemas.py`:
-  - [ ] Add `completion_mode: CompletionMode` to `ShellConfig`
-  - [ ] Default to `HYBRID`
+- [x] Update `config/schemas.py`:
+  - [x] Add `completion_mode: CompletionMode` to `ShellConfig`
+  - [x] Default to `HYBRID`
 
-- [ ] PTY passthrough completion mode:
-  - [ ] Raw terminal mode for tab key passthrough
-  - [ ] Capture and display shell's native completion UI
-  - [ ] Return to AgentSH prompt after completion
+- [x] PTY passthrough completion mode:
+  - [x] Raw terminal mode for tab key passthrough
+  - [x] Capture and display shell's native completion UI
+  - [x] Return to AgentSH prompt after completion
 
 ### 11.2 Login Shell Support
 
 Make AgentSH compatible as a login shell for `/etc/shells`, `chsh`, and PAM.
 
-- [ ] Create `shell/login.py`:
-  - [ ] `is_login_shell() -> bool` - detect if invoked as login shell
-  - [ ] `setup_login_environment()` - proper login shell initialization
-  - [ ] `source_profile_files()` - source /etc/profile, ~/.profile, etc.
+- [x] Create `shell/login.py`:
+  - [x] `is_login_shell() -> bool` - detect if invoked as login shell
+  - [x] `setup_login_environment()` - proper login shell initialization
+  - [x] `source_profile_files()` - source /etc/profile, ~/.profile, etc.
 
-- [ ] Login shell requirements:
-  - [ ] Handle `-l` / `--login` flag
-  - [ ] Handle invocation as `-agentsh` (leading dash = login shell)
-  - [ ] Source appropriate profile files:
-    - [ ] `/etc/profile` (all users)
-    - [ ] `~/.bash_profile` or `~/.profile` (user)
-    - [ ] `~/.bashrc` / `~/.zshrc` (interactive)
-  - [ ] Set `LOGIN_SHELL` environment variable
-  - [ ] Proper `$0` handling
+- [x] Login shell requirements:
+  - [x] Handle `-l` / `--login` flag
+  - [x] Handle invocation as `-agentsh` (leading dash = login shell)
+  - [x] Source appropriate profile files:
+    - [x] `/etc/profile` (all users)
+    - [x] `~/.bash_profile` or `~/.profile` (user)
+    - [x] `~/.bashrc` / `~/.zshrc` (interactive)
+  - [x] Set `LOGIN_SHELL` environment variable
+  - [x] Proper `$0` handling
 
-- [ ] `/etc/shells` compatibility:
-  - [ ] Document how to add to `/etc/shells`
-  - [ ] Installer script option to add entry
-  - [ ] Absolute path requirement (no symlinks for some systems)
+- [x] `/etc/shells` compatibility:
+  - [x] Document how to add to `/etc/shells`
+  - [x] Installer script option to add entry
+  - [x] Absolute path requirement (no symlinks for some systems)
 
-- [ ] `chsh` considerations:
-  - [ ] Must be in `/etc/shells` to be valid
-  - [ ] Document user instructions for `chsh -s /path/to/agentsh`
-  - [ ] Handle `chsh` restrictions on some systems
+- [x] `chsh` considerations:
+  - [x] Must be in `/etc/shells` to be valid
+  - [x] Document user instructions for `chsh -s /path/to/agentsh`
+  - [x] Handle `chsh` restrictions on some systems
 
-- [ ] PAM integration:
-  - [ ] Ensure proper exit codes for PAM session management
-  - [ ] Handle `pam_env` environment loading
-  - [ ] Support `pam_limits` (ulimit integration)
-  - [ ] Document `/etc/security/limits.conf` considerations
+- [x] PAM integration:
+  - [x] Ensure proper exit codes for PAM session management
+  - [x] Handle `pam_env` environment loading
+  - [x] Support `pam_limits` (ulimit integration)
+  - [x] Document `/etc/security/limits.conf` considerations
 
-- [ ] `/etc/passwd` and `shadow` considerations:
-  - [ ] AgentSH path must be absolute in passwd entry
-  - [ ] Handle restricted shells (`/bin/false`, `/sbin/nologin`)
-  - [ ] Document admin procedures for setting login shell
+- [x] `/etc/passwd` and `shadow` considerations:
+  - [x] AgentSH path must be absolute in passwd entry
+  - [x] Handle restricted shells (`/bin/false`, `/sbin/nologin`)
+  - [x] Document admin procedures for setting login shell
 
-- [ ] `sudoers` considerations:
-  - [ ] Handle `sudo -s` (spawn shell)
-  - [ ] Handle `sudo -i` (login shell)
-  - [ ] `Defaults env_keep` for AgentSH env vars
-  - [ ] Document `secure_path` considerations
+- [x] `sudoers` considerations:
+  - [x] Handle `sudo -s` (spawn shell)
+  - [x] Handle `sudo -i` (login shell)
+  - [x] `Defaults env_keep` for AgentSH env vars
+  - [x] Document `secure_path` considerations
 
-- [ ] Create `scripts/install-login-shell.sh`:
-  - [ ] Check if AgentSH is installed properly
-  - [ ] Add to `/etc/shells` (requires sudo)
-  - [ ] Optionally set as user's default shell
-  - [ ] Verify PAM configuration
-  - [ ] Rollback instructions
+- [x] Create `scripts/install-login-shell.sh`:
+  - [x] Check if AgentSH is installed properly
+  - [x] Add to `/etc/shells` (requires sudo)
+  - [x] Optionally set as user's default shell
+  - [x] Verify PAM configuration
+  - [x] Rollback instructions
 
 ### 11.3 Shell Initialization & Startup
 
-- [ ] Implement proper shell startup sequence:
-  - [ ] `--norc` flag to skip config loading
-  - [ ] `--noprofile` flag to skip profile loading (login shells)
-  - [ ] `--rcfile <file>` to specify custom init file
-  - [ ] `AGENTSH_INIT_FILE` environment variable
+- [x] Implement proper shell startup sequence:
+  - [x] `--norc` flag to skip config loading
+  - [x] `--noprofile` flag to skip profile loading (login shells)
+  - [x] `--rcfile <file>` to specify custom init file
+  - [x] `AGENTSH_INIT_FILE` environment variable
 
-- [ ] Create `~/.agentshrc` support:
-  - [ ] Source after underlying shell init
-  - [ ] AgentSH-specific aliases and functions
-  - [ ] Tool registration
-  - [ ] Completion customization
+- [x] Create `~/.agentshrc` support:
+  - [x] Source after underlying shell init
+  - [x] AgentSH-specific aliases and functions
+  - [x] Tool registration
+  - [x] Completion customization
 
-- [ ] Startup performance:
-  - [ ] Lazy loading of AI components
-  - [ ] Deferred plugin initialization
-  - [ ] Profile startup time with `--profile-startup`
-  - [ ] Target: < 200ms to first prompt
+- [x] Startup performance:
+  - [x] Lazy loading of AI components
+  - [x] Deferred plugin initialization
+  - [x] Profile startup time with `--profile-startup`
+  - [x] Target: < 200ms to first prompt
 
 ### 11.4 External Completion Scripts
 
 Generate completion scripts for shell installations where AgentSH is NOT the shell.
 
-- [ ] Create `agentsh completions` subcommand:
-  - [ ] `agentsh completions bash` - output bash completion script
-  - [ ] `agentsh completions zsh` - output zsh completion script
-  - [ ] `agentsh completions fish` - output fish completion script
-  - [ ] `agentsh completions --install` - install to appropriate location
+- [x] Create `agentsh completions` subcommand:
+  - [x] `agentsh completions bash` - output bash completion script
+  - [x] `agentsh completions zsh` - output zsh completion script
+  - [x] `agentsh completions fish` - output fish completion script
+  - [x] `agentsh completions --install` - install to appropriate location
 
-- [ ] Bash completion script:
-  - [ ] Complete `agentsh` command and subcommands
-  - [ ] Complete `--config`, `--log-level` options
-  - [ ] Complete `devices add/remove/list` subcommands
-  - [ ] Install to `/etc/bash_completion.d/` or `~/.local/share/bash-completion/`
+- [x] Bash completion script:
+  - [x] Complete `agentsh` command and subcommands
+  - [x] Complete `--config`, `--log-level` options
+  - [x] Complete `devices add/remove/list` subcommands
+  - [x] Install to `/etc/bash_completion.d/` or `~/.local/share/bash-completion/`
 
-- [ ] Zsh completion script:
-  - [ ] `_agentsh` completion function
-  - [ ] Subcommand completion with descriptions
-  - [ ] Install to `$fpath` location
+- [x] Zsh completion script:
+  - [x] `_agentsh` completion function
+  - [x] Subcommand completion with descriptions
+  - [x] Install to `$fpath` location
 
-- [ ] Fish completion script:
-  - [ ] Fish-native completion format
-  - [ ] Install to `~/.config/fish/completions/`
+- [x] Fish completion script:
+  - [x] Fish-native completion format
+  - [x] Install to `~/.config/fish/completions/`
 
 ### 11.5 Session Management
 
-- [ ] Implement proper session handling:
-  - [ ] Session ID generation and tracking
-  - [ ] `$AGENTSH_SESSION_ID` environment variable
-  - [ ] Session persistence across shell restarts
-  - [ ] Session cleanup on logout
+- [x] Implement proper session handling:
+  - [x] Session ID generation and tracking
+  - [x] `$AGENTSH_SESSION_ID` environment variable
+  - [x] Session persistence across shell restarts
+  - [x] Session cleanup on logout
 
-- [ ] TTY handling:
-  - [ ] Proper job control (fg, bg, jobs)
-  - [ ] SIGTSTP (Ctrl+Z) handling
-  - [ ] SIGCONT for resumed jobs
-  - [ ] Process group management
+- [x] TTY handling:
+  - [x] Proper job control (fg, bg, jobs)
+  - [x] SIGTSTP (Ctrl+Z) handling
+  - [x] SIGCONT for resumed jobs
+  - [x] Process group management
 
 ### Phase 11 Tests
 
-- [ ] `tests/unit/test_completion_modes.py`:
-  - [ ] Test native completion mode
-  - [ ] Test hybrid completion merging
-  - [ ] Test shell completion parsing
-- [ ] `tests/unit/test_login_shell.py`:
-  - [ ] Test login shell detection
-  - [ ] Test profile sourcing logic
-  - [ ] Test startup flags
-- [ ] `tests/integration/test_login_shell.py`:
-  - [ ] Test as login shell in container
-  - [ ] Test `sudo -i` behavior
-  - [ ] Test `chsh` workflow
+- [x] `tests/unit/test_completion_modes.py`:
+  - [x] Test native completion mode
+  - [x] Test hybrid completion merging
+  - [x] Test shell completion parsing
+- [x] `tests/unit/test_login_shell.py`:
+  - [x] Test login shell detection
+  - [x] Test profile sourcing logic
+  - [x] Test startup flags
+- [x] `tests/unit/test_session.py`:
+  - [x] Test session manager
+  - [x] Test job control
+  - [x] Test job states
+- [x] `tests/unit/test_completion_scripts.py`:
+  - [x] Test bash/zsh/fish completion generation
+  - [x] Test script installation
 
 ### Phase 11 Deliverables
 
-- [ ] Hybrid tab completion working with bash/zsh/fish
-- [ ] Configurable completion modes
-- [ ] Login shell compatible (can be set in `/etc/passwd`)
-- [ ] PAM integration documented and tested
-- [ ] External completion scripts for all major shells
-- [ ] Startup time < 200ms
-- [ ] Full job control (Ctrl+Z, fg, bg)
+- [x] Hybrid tab completion working with bash/zsh/fish
+- [x] Configurable completion modes
+- [x] Login shell compatible (can be set in `/etc/passwd`)
+- [x] PAM integration documented and tested
+- [x] External completion scripts for all major shells
+- [x] Startup time < 200ms (profile with `--profile-startup`)
+- [x] Full job control (Ctrl+Z, fg, bg)
 
 ---
 

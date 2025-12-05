@@ -5,8 +5,10 @@ Usage:
     agentsh                     Start interactive shell
     agentsh --version           Show version
     agentsh --config <path>     Use custom config file
+    agentsh --login             Run as login shell
     agentsh config show         Show current configuration
     agentsh status              Check system health
+    agentsh completions bash    Output bash completion script
     agentsh --mcp-server        Run as MCP server (for remote LLM integration)
 """
 
@@ -63,6 +65,38 @@ For more information, visit: https://github.com/agentsh/agentsh
         help="Run as MCP server for remote LLM integration",
     )
 
+    # Login shell options
+    parser.add_argument(
+        "-l", "--login",
+        action="store_true",
+        help="Run as login shell (source profile files)",
+    )
+
+    parser.add_argument(
+        "--noprofile",
+        action="store_true",
+        help="Don't source profile files (login shells only)",
+    )
+
+    parser.add_argument(
+        "--norc",
+        action="store_true",
+        help="Don't source rc files",
+    )
+
+    parser.add_argument(
+        "--rcfile",
+        type=Path,
+        metavar="FILE",
+        help="Use FILE instead of ~/.agentshrc",
+    )
+
+    parser.add_argument(
+        "--profile-startup",
+        action="store_true",
+        help="Profile startup time and show timing",
+    )
+
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -74,6 +108,22 @@ For more information, visit: https://github.com/agentsh/agentsh
 
     # status subcommand
     subparsers.add_parser("status", help="Check system health")
+
+    # completions subcommand
+    completions_parser = subparsers.add_parser(
+        "completions",
+        help="Generate shell completion scripts",
+    )
+    completions_parser.add_argument(
+        "shell",
+        choices=["bash", "zsh", "fish"],
+        help="Shell to generate completions for",
+    )
+    completions_parser.add_argument(
+        "--install",
+        action="store_true",
+        help="Install completions to appropriate location",
+    )
 
     # devices subcommand (placeholder for Phase 8)
     devices_parser = subparsers.add_parser("devices", help="Device management")
@@ -281,9 +331,56 @@ def cmd_devices(args: argparse.Namespace) -> int:
         return 1
 
 
-def cmd_interactive_shell(config_path: Optional[Path], log_level: Optional[str]) -> int:
+def cmd_completions(args: argparse.Namespace) -> int:
+    """Generate or install shell completion scripts."""
+    from agentsh.shell.completion_scripts import (
+        get_bash_completion,
+        get_zsh_completion,
+        get_fish_completion,
+        install_completion,
+    )
+
+    shell = args.shell
+
+    if shell == "bash":
+        script = get_bash_completion()
+    elif shell == "zsh":
+        script = get_zsh_completion()
+    elif shell == "fish":
+        script = get_fish_completion()
+    else:
+        print(f"Unknown shell: {shell}", file=sys.stderr)
+        return 1
+
+    if args.install:
+        success, path = install_completion(shell, script)
+        if success:
+            print(f"Installed {shell} completions to: {path}")
+            return 0
+        else:
+            print(f"Failed to install completions: {path}", file=sys.stderr)
+            return 1
+    else:
+        print(script)
+        return 0
+
+
+def cmd_interactive_shell(
+    config_path: Optional[Path],
+    log_level: Optional[str],
+    login: bool = False,
+    noprofile: bool = False,
+    norc: bool = False,
+    rcfile: Optional[Path] = None,
+    profile_startup: bool = False,
+) -> int:
     """Start the interactive shell."""
+    import time
     from agentsh.shell.wrapper import ShellWrapper
+    from agentsh.shell.login import LoginShellManager
+    from agentsh.shell.session import get_session, cleanup_session
+
+    start_time = time.time() if profile_startup else None
 
     try:
         config = load_config(config_path)
@@ -293,9 +390,32 @@ def cmd_interactive_shell(config_path: Optional[Path], log_level: Optional[str])
 
         setup_logging(config.log_level, config.telemetry.log_file)
         logger = get_logger(__name__)
+
+        # Set up login shell if needed
+        login_manager = None
+        if login or config.shell.login_shell:
+            login_manager = LoginShellManager(
+                force_login=login,
+                skip_profile=noprofile,
+                skip_rc=norc,
+                custom_rc=rcfile or config.shell.rc_file,
+            )
+            login_manager.setup_environment()
+            login_manager.source_profiles(config.shell.backend)
+            login_manager.source_rc_files(config.shell.backend)
+
+        # Initialize session
+        session = get_session()
+
+        if profile_startup:
+            print(f"[startup] Config loaded: {(time.time() - start_time)*1000:.1f}ms")
+
         logger.info("Starting AgentSH", version=__version__)
 
         shell = ShellWrapper(config)
+
+        if profile_startup:
+            print(f"[startup] Shell initialized: {(time.time() - start_time)*1000:.1f}ms")
 
         # Set up AI handler if API key is configured
         if config.llm.api_key:
@@ -313,11 +433,24 @@ def cmd_interactive_shell(config_path: Optional[Path], log_level: Optional[str])
                 logger.warning("Failed to configure AI handler", error=str(e))
                 # Continue without AI - will show placeholder
 
+        if profile_startup:
+            total_ms = (time.time() - start_time) * 1000
+            print(f"[startup] Ready: {total_ms:.1f}ms")
+            if total_ms > 200:
+                print(f"[startup] Warning: startup time exceeds 200ms target")
+
         shell.run()
+
+        # Cleanup
+        cleanup_session()
+        if login_manager:
+            login_manager.cleanup()
+
         return 0
 
     except KeyboardInterrupt:
         print("\nGoodbye!")
+        cleanup_session()
         return 0
     except Exception as e:
         print(f"Error starting AgentSH: {e}", file=sys.stderr)
@@ -342,6 +475,9 @@ def main() -> int:
     elif args.command == "status":
         return cmd_status()
 
+    elif args.command == "completions":
+        return cmd_completions(args)
+
     elif args.command == "devices":
         return cmd_devices(args)
 
@@ -350,7 +486,15 @@ def main() -> int:
 
     else:
         # Default: start interactive shell
-        return cmd_interactive_shell(args.config, args.log_level)
+        return cmd_interactive_shell(
+            config_path=args.config,
+            log_level=args.log_level,
+            login=args.login,
+            noprofile=args.noprofile,
+            norc=args.norc,
+            rcfile=args.rcfile,
+            profile_startup=args.profile_startup,
+        )
 
 
 if __name__ == "__main__":

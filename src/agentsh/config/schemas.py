@@ -30,6 +30,14 @@ class MemoryType(str, Enum):
     PERSISTENT = "persistent"
 
 
+class CompletionMode(str, Enum):
+    """Tab completion modes."""
+
+    NATIVE = "native"  # Only AgentSH completions
+    PASSTHROUGH = "passthrough"  # Full PTY passthrough
+    HYBRID = "hybrid"  # Merge AgentSH + shell completions (default)
+
+
 class LLMConfig(BaseModel):
     """LLM provider configuration."""
 
@@ -103,6 +111,23 @@ class ShellConfig(BaseModel):
     default_to_ai: bool = Field(
         default=False,
         description="Route unrecognized input to AI (vs shell)",
+    )
+    completion_mode: CompletionMode = Field(
+        default=CompletionMode.HYBRID,
+        description="Tab completion mode (native, passthrough, hybrid)",
+    )
+    completion_timeout: float = Field(
+        default=2.0,
+        gt=0,
+        description="Timeout for shell completion queries in seconds",
+    )
+    login_shell: bool = Field(
+        default=False,
+        description="Run as login shell (source profile files)",
+    )
+    rc_file: Optional[Path] = Field(
+        default=None,
+        description="Custom RC file to source (~/.agentshrc by default)",
     )
 
 

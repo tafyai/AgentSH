@@ -1,10 +1,9 @@
 """Tab completion for AgentSH shell.
 
-Provides intelligent tab completion for:
-- Special commands (:help, :config, etc.)
-- Tool names (shell.run, fs.read, etc.)
-- File paths
-- Command history
+Provides intelligent tab completion with configurable modes:
+- NATIVE: Only AgentSH completions (special commands, tools, paths)
+- PASSTHROUGH: Full PTY passthrough for completions
+- HYBRID: Merge AgentSH + shell completions (default)
 """
 
 import os
@@ -14,6 +13,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Optional
 
+from agentsh.shell.completion_modes import (
+    CompletionConfig,
+    CompletionMode,
+    ShellCompletionProxy,
+    merge_completions,
+)
+
 
 class CompletionType(str, Enum):
     """Types of completions."""
@@ -21,6 +27,7 @@ class CompletionType(str, Enum):
     SPECIAL_COMMAND = "special_command"
     TOOL = "tool"
     FILE_PATH = "file_path"
+    SHELL_COMMAND = "shell_command"
     HISTORY = "history"
     NONE = "none"
 
@@ -38,13 +45,15 @@ class ShellCompleter:
     """Tab completion handler for AgentSH.
 
     Provides context-aware completions based on:
+    - Completion mode (native, passthrough, hybrid)
     - Current input prefix
     - Available tools
     - Special commands
     - File system paths
+    - Underlying shell completions (in hybrid mode)
 
     Example:
-        completer = ShellCompleter()
+        completer = ShellCompleter(mode=CompletionMode.HYBRID)
         completer.register_tool("shell.run", "Execute shell commands")
         completer.register_tool("fs.read", "Read file contents")
 
@@ -54,13 +63,53 @@ class ShellCompleter:
         # Now tab completion works in readline
     """
 
-    def __init__(self) -> None:
-        """Initialize the completer."""
+    def __init__(
+        self,
+        mode: CompletionMode = CompletionMode.HYBRID,
+        config: Optional[CompletionConfig] = None,
+    ) -> None:
+        """Initialize the completer.
+
+        Args:
+            mode: Completion mode (NATIVE, PASSTHROUGH, HYBRID)
+            config: Completion configuration
+        """
+        self._mode = mode
+        self._config = config or CompletionConfig(mode=mode)
         self._tools: dict[str, str] = {}  # name -> description
         self._special_commands: dict[str, str] = {}  # command -> description
         self._history: list[str] = []
         self._matches: list[str] = []
         self._installed = False
+
+        # Shell completion proxy for hybrid mode
+        self._shell_proxy: Optional[ShellCompletionProxy] = None
+        if mode in (CompletionMode.HYBRID, CompletionMode.PASSTHROUGH):
+            self._shell_proxy = ShellCompletionProxy(
+                shell=self._config.shell,
+                timeout=self._config.timeout,
+            )
+
+    @property
+    def mode(self) -> CompletionMode:
+        """Get current completion mode."""
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: CompletionMode) -> None:
+        """Set completion mode."""
+        self._mode = value
+        self._config.mode = value
+
+        # Initialize shell proxy if needed
+        if value in (CompletionMode.HYBRID, CompletionMode.PASSTHROUGH):
+            if self._shell_proxy is None:
+                self._shell_proxy = ShellCompletionProxy(
+                    shell=self._config.shell,
+                    timeout=self._config.timeout,
+                )
+        else:
+            self._shell_proxy = None
 
     def register_tool(self, name: str, description: str = "") -> None:
         """Register a tool for completion.
@@ -137,25 +186,74 @@ class ShellCompleter:
         Returns:
             List of possible completions
         """
-        # Determine completion type based on context
         stripped_line = line.lstrip()
 
+        # In passthrough mode, only use shell completions
+        if self._mode == CompletionMode.PASSTHROUGH:
+            return self._get_shell_completions(text, line)
+
+        # Get AgentSH completions
+        agentsh_completions = self._get_agentsh_completions(text, stripped_line)
+
+        # In native mode, only return AgentSH completions
+        if self._mode == CompletionMode.NATIVE:
+            return agentsh_completions
+
+        # Hybrid mode: merge AgentSH and shell completions
+        shell_completions = self._get_shell_completions(text, line)
+
+        return merge_completions(
+            agentsh_completions,
+            shell_completions,
+            self._config,
+        )
+
+    def _get_agentsh_completions(self, text: str, line: str) -> list[str]:
+        """Get AgentSH-specific completions.
+
+        Args:
+            text: Word being completed
+            line: Full input line (stripped)
+
+        Returns:
+            List of AgentSH completions
+        """
         # Special commands (starting with :)
-        if stripped_line.startswith(":"):
-            return self._complete_special_command(text, stripped_line)
+        if line.startswith(":"):
+            return self._complete_special_command(text, line)
 
         # File paths (contains / or starts with . or ~)
         if "/" in text or text.startswith(".") or text.startswith("~"):
             return self._complete_path(text)
 
-        # Tool names (for AI requests)
-        if text and not stripped_line.startswith("!"):
+        # Tool names (for AI requests, not shell commands)
+        if text and not line.startswith("!"):
             tool_matches = self._complete_tool(text)
             if tool_matches:
                 return tool_matches
 
-        # Default: no completions
         return []
+
+    def _get_shell_completions(self, text: str, line: str) -> list[str]:
+        """Get completions from underlying shell.
+
+        Args:
+            text: Word being completed
+            line: Full input line
+
+        Returns:
+            List of shell completions
+        """
+        if self._shell_proxy is None:
+            return []
+
+        # Query shell for completions
+        result = self._shell_proxy.query(line)
+
+        if not result.success:
+            return []
+
+        return result.completions
 
     def _complete_special_command(self, text: str, line: str) -> list[str]:
         """Complete special commands.
@@ -228,6 +326,11 @@ class ShellCompleter:
         matches = []
         try:
             for entry in os.listdir(directory):
+                # Skip hidden files unless configured or prefix starts with .
+                if entry.startswith(".") and not file_prefix.startswith("."):
+                    if not self._config.include_hidden:
+                        continue
+
                 if entry.startswith(file_prefix):
                     full_path = os.path.join(directory, entry)
                     # Add trailing slash for directories
@@ -237,7 +340,7 @@ class ShellCompleter:
                     if text.startswith("~"):
                         result = text[:prefix_len] + os.path.join(
                             directory.replace(os.path.expanduser("~"), ""),
-                            entry
+                            entry,
                         ).lstrip("/")
                     else:
                         result = os.path.join(directory, entry)
@@ -294,23 +397,28 @@ def get_completer() -> ShellCompleter:
 def setup_completion(
     tools: Optional[dict[str, str]] = None,
     special_commands: Optional[dict[str, str]] = None,
+    mode: CompletionMode = CompletionMode.HYBRID,
+    config: Optional[CompletionConfig] = None,
 ) -> ShellCompleter:
     """Set up tab completion with given tools and commands.
 
     Args:
         tools: Dict of tool name -> description
         special_commands: Dict of command name -> description
+        mode: Completion mode (NATIVE, PASSTHROUGH, HYBRID)
+        config: Completion configuration
 
     Returns:
         Configured ShellCompleter
     """
-    completer = get_completer()
+    global _completer
+    _completer = ShellCompleter(mode=mode, config=config)
 
     if tools:
-        completer.register_tools(tools)
+        _completer.register_tools(tools)
 
     if special_commands:
-        completer.register_special_commands(special_commands)
+        _completer.register_special_commands(special_commands)
 
-    completer.install()
-    return completer
+    _completer.install()
+    return _completer
