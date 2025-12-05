@@ -1,0 +1,73 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv
+venv/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+*.log
+*.tmp
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# Packaging (except docker)
+packaging/homebrew/
+packaging/debian/
+packaging/rpm/
+packaging/arch/
+packaging/alpine/
+packaging/windows/
+
+# Documentation build
+docs/_build/
+
+# Local config
+.env
+.env.local
+*.local
+
+# OS files
+.DS_Store
+Thumbs.db

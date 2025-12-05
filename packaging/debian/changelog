@@ -1,0 +1,9 @@
+agentsh (0.1.0-1) unstable; urgency=medium
+
+  * Initial release.
+  * AI-enhanced terminal shell with natural language support
+  * Multi-provider LLM support (Anthropic, OpenAI, Ollama, OpenRouter)
+  * Full PTY support for interactive programs
+  * Bash/Zsh/Fish compatible completions
+
+ -- AgentSH Team <team@agentsh.dev>  Thu, 05 Dec 2024 00:00:00 +0000

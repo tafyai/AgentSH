@@ -1,0 +1,92 @@
+# Maintainer: AgentSH Team <team@agentsh.dev>
+pkgname=agentsh
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="AI-enhanced terminal shell with natural language support"
+url="https://github.com/agentsh/agentsh"
+arch="noarch"
+license="MIT"
+depends="
+    python3>=3.10
+    py3-httpx
+    py3-click
+    py3-rich
+    py3-yaml
+    py3-pydantic
+"
+makedepends="
+    py3-build
+    py3-installer
+    py3-wheel
+    py3-setuptools
+"
+subpackages="
+    $pkgname-bash-completion
+    $pkgname-zsh-completion
+    $pkgname-fish-completion
+    $pkgname-doc
+"
+source="https://files.pythonhosted.org/packages/source/${pkgname%"${pkgname#?}"}/$pkgname/$pkgname-$pkgver.tar.gz"
+
+build() {
+    python3 -m build --wheel --no-isolation
+}
+
+check() {
+    python3 -m pytest tests/ -v --ignore=tests/integration
+}
+
+package() {
+    python3 -m installer --destdir="$pkgdir" dist/*.whl
+
+    # Install license
+    install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+
+    # Install documentation
+    install -Dm644 README.md "$pkgdir"/usr/share/doc/$pkgname/README.md
+}
+
+bash_completion() {
+    pkgdesc="Bash completions for $pkgname"
+    depends=""
+    install_if="$pkgname=$pkgver-r$pkgrel bash-completion"
+
+    install -Dm644 "$builddir"/completions/agentsh.bash \
+        "$subpkgdir"/usr/share/bash-completion/completions/agentsh
+}
+
+zsh_completion() {
+    pkgdesc="Zsh completions for $pkgname"
+    depends=""
+    install_if="$pkgname=$pkgver-r$pkgrel zsh"
+
+    install -Dm644 "$builddir"/completions/agentsh.zsh \
+        "$subpkgdir"/usr/share/zsh/site-functions/_agentsh
+}
+
+fish_completion() {
+    pkgdesc="Fish completions for $pkgname"
+    depends=""
+    install_if="$pkgname=$pkgver-r$pkgrel fish"
+
+    install -Dm644 "$builddir"/completions/agentsh.fish \
+        "$subpkgdir"/usr/share/fish/vendor_completions.d/agentsh.fish
+}
+
+post_install() {
+    # Add to /etc/shells if not present
+    local agentsh_path="/usr/bin/agentsh"
+    if [ -x "$agentsh_path" ] && ! grep -q "^${agentsh_path}$" /etc/shells 2>/dev/null; then
+        echo "$agentsh_path" >> /etc/shells
+    fi
+}
+
+post_deinstall() {
+    # Remove from /etc/shells
+    local agentsh_path="/usr/bin/agentsh"
+    if [ -f /etc/shells ]; then
+        sed -i "\|^${agentsh_path}$|d" /etc/shells
+    fi
+}
+
+sha512sums="SKIP"

@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+export PYBUILD_NAME = agentsh
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_install:
+	dh_auto_install
+	# Install shell completions
+	install -D -m 644 debian/agentsh.bash-completion \
+		debian/agentsh/usr/share/bash-completion/completions/agentsh
+	install -D -m 644 completions/agentsh.zsh \
+		debian/agentsh/usr/share/zsh/vendor-completions/_agentsh
+	install -D -m 644 completions/agentsh.fish \
+		debian/agentsh/usr/share/fish/vendor_completions.d/agentsh.fish
+
+override_dh_installchangelogs:
+	dh_installchangelogs CHANGELOG.md

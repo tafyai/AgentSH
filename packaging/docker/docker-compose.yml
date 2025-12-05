@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # Main AgentSH service
+  agentsh:
+    build:
+      context: ../..
+      dockerfile: packaging/docker/Dockerfile
+    image: agentsh:latest
+    container_name: agentsh
+    stdin_open: true
+    tty: true
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - AGENTSH_CONFIG_DIR=/home/agentsh/.config/agentsh
+    volumes:
+      - agentsh-config:/home/agentsh/.config/agentsh
+      - agentsh-history:/home/agentsh/.local/share/agentsh
+
+  # Alpine minimal image
+  agentsh-alpine:
+    build:
+      context: ../..
+      dockerfile: packaging/docker/Dockerfile.alpine
+    image: agentsh:alpine
+    container_name: agentsh-alpine
+    stdin_open: true
+    tty: true
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - agentsh-config:/home/agentsh/.config/agentsh
+
+  # Development image
+  agentsh-dev:
+    build:
+      context: ../..
+      dockerfile: packaging/docker/Dockerfile.dev
+    image: agentsh:dev
+    container_name: agentsh-dev
+    stdin_open: true
+    tty: true
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+    volumes:
+      - ../..:/app
+      - dev-pip-cache:/root/.cache/pip
+
+  # Ollama companion service for local LLMs
+  ollama:
+    image: ollama/ollama:latest
+    container_name: agentsh-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    # Uncomment for GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # AgentSH with Ollama (local LLM)
+  agentsh-local:
+    build:
+      context: ../..
+      dockerfile: packaging/docker/Dockerfile
+    image: agentsh:latest
+    container_name: agentsh-local
+    stdin_open: true
+    tty: true
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - AGENTSH_PROVIDER=ollama
+      - AGENTSH_MODEL=llama3.2
+    depends_on:
+      - ollama
+    volumes:
+      - agentsh-config:/home/agentsh/.config/agentsh
+
+volumes:
+  agentsh-config:
+  agentsh-history:
+  ollama-models:
+  dev-pip-cache:

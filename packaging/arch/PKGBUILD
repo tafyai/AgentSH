@@ -1,0 +1,76 @@
+# Maintainer: AgentSH Team <team@agentsh.dev>
+
+pkgname=agentsh
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="AI-enhanced terminal shell with natural language support"
+arch=('any')
+url="https://github.com/agentsh/agentsh"
+license=('MIT')
+depends=(
+    'python>=3.10'
+    'python-httpx'
+    'python-click'
+    'python-rich'
+    'python-pyyaml'
+    'python-pydantic'
+)
+makedepends=(
+    'python-build'
+    'python-installer'
+    'python-wheel'
+    'python-setuptools'
+)
+optdepends=(
+    'python-anthropic: Anthropic Claude API support'
+    'python-openai: OpenAI API support'
+    'ollama: Local LLM inference'
+    'python-litellm: Multi-provider LLM support'
+)
+source=("https://files.pythonhosted.org/packages/source/${pkgname::1}/${pkgname}/${pkgname}-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "${srcdir}/${pkgname}-${pkgver}"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "${srcdir}/${pkgname}-${pkgver}"
+    python -m installer --destdir="${pkgdir}" dist/*.whl
+
+    # Install license
+    install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+
+    # Install shell completions
+    install -Dm644 completions/agentsh.bash \
+        "${pkgdir}/usr/share/bash-completion/completions/agentsh"
+    install -Dm644 completions/agentsh.zsh \
+        "${pkgdir}/usr/share/zsh/site-functions/_agentsh"
+    install -Dm644 completions/agentsh.fish \
+        "${pkgdir}/usr/share/fish/vendor_completions.d/agentsh.fish"
+
+    # Install documentation
+    install -Dm644 README.md "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+}
+
+post_install() {
+    # Add to /etc/shells if not present
+    local agentsh_path="/usr/bin/agentsh"
+    if [[ -x "$agentsh_path" ]] && ! grep -q "^${agentsh_path}$" /etc/shells 2>/dev/null; then
+        echo "$agentsh_path" >> /etc/shells
+    fi
+
+    echo "==> AgentSH has been installed!"
+    echo "==> To start: agentsh"
+    echo "==> To configure: agentsh config init"
+    echo "==> To set as default shell: chsh -s /usr/bin/agentsh"
+}
+
+post_remove() {
+    # Remove from /etc/shells
+    local agentsh_path="/usr/bin/agentsh"
+    if [[ -f /etc/shells ]]; then
+        sed -i "\|^${agentsh_path}$|d" /etc/shells
+    fi
+}

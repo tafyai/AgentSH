@@ -1,0 +1,59 @@
+# AgentSH Development Docker Image
+#
+# Build:
+#   docker build -t agentsh:dev -f Dockerfile.dev .
+#
+# Run with source mounted:
+#   docker run -it --rm \
+#     -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+#     -v $(pwd):/app \
+#     agentsh:dev
+
+FROM python:3.11-bookworm
+
+LABEL org.opencontainers.image.title="AgentSH Development"
+LABEL org.opencontainers.image.description="AI-enhanced terminal shell - Development image"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    wget \
+    less \
+    vim \
+    nano \
+    jq \
+    tree \
+    ncurses-term \
+    locales \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && locale-gen en_US.UTF-8
+
+# Set locale
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+ENV TERM=xterm-256color
+
+# Install development tools
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    mypy \
+    ruff \
+    black \
+    isort \
+    pre-commit
+
+# Set working directory
+WORKDIR /app
+
+# Install in editable mode (expects source to be mounted)
+# This is done at runtime via docker-entrypoint.sh
+
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["/usr/local/bin/agentsh"]

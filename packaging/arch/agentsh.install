@@ -1,0 +1,26 @@
+# AgentSH pacman install hooks
+
+post_install() {
+    # Add to /etc/shells if not present
+    local agentsh_path="/usr/bin/agentsh"
+    if [[ -x "$agentsh_path" ]] && ! grep -q "^${agentsh_path}$" /etc/shells 2>/dev/null; then
+        echo "$agentsh_path" >> /etc/shells
+    fi
+
+    echo "==> AgentSH has been installed!"
+    echo "==> To start: agentsh"
+    echo "==> To configure: agentsh config init"
+    echo "==> To set as default shell: chsh -s /usr/bin/agentsh"
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    # Remove from /etc/shells
+    local agentsh_path="/usr/bin/agentsh"
+    if [[ -f /etc/shells ]]; then
+        sed -i "\|^${agentsh_path}$|d" /etc/shells
+    fi
+}

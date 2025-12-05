@@ -1,0 +1,54 @@
+# AgentSH Alpine Docker Image (minimal)
+#
+# Build:
+#   docker build -t agentsh:alpine -f Dockerfile.alpine .
+#
+# Run:
+#   docker run -it --rm -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY agentsh:alpine
+
+FROM python:3.11-alpine
+
+LABEL org.opencontainers.image.title="AgentSH (Alpine)"
+LABEL org.opencontainers.image.description="AI-enhanced terminal shell - Alpine minimal image"
+LABEL org.opencontainers.image.url="https://github.com/agentsh/agentsh"
+
+# Install system dependencies
+RUN apk add --no-cache \
+    git \
+    curl \
+    wget \
+    less \
+    vim \
+    jq \
+    tree \
+    ncurses \
+    bash
+
+# Set locale-related env vars
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV TERM=xterm-256color
+
+# Create non-root user
+RUN adduser -D -s /bin/sh agentsh
+
+# Install AgentSH
+RUN pip install --no-cache-dir agentsh anthropic openai || pip install --no-cache-dir agentsh
+
+# Add to /etc/shells
+RUN echo "/usr/local/bin/agentsh" >> /etc/shells
+
+# Set working directory
+WORKDIR /home/agentsh
+
+# Switch to non-root user
+USER agentsh
+
+# Create config directory
+RUN mkdir -p /home/agentsh/.config/agentsh
+
+# Set shell
+ENV SHELL=/usr/local/bin/agentsh
+
+# Default command
+ENTRYPOINT ["/usr/local/bin/agentsh"]

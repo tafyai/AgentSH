@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    purge|remove)
+        # Remove agentsh from /etc/shells
+        AGENTSH_PATH="/usr/bin/agentsh"
+        if [ -f /etc/shells ]; then
+            # Create temp file without agentsh
+            grep -v "^${AGENTSH_PATH}$" /etc/shells > /etc/shells.tmp 2>/dev/null || true
+            mv /etc/shells.tmp /etc/shells
+        fi
+        ;;
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

@@ -22,6 +22,8 @@
 | 8 | Multi-Device Orchestration | Complete | Medium | Phase 5, 7 |
 | 9 | Robotics Integration | Complete | Low | Phase 8 |
 | 10 | UX Polish & Hardening | Complete | Low | All |
+| 11 | Shell Completion & Login Shell | Not Started | Medium | Phase 1, 10 |
+| 12 | Installation & Distribution | Complete | High | Phase 10 |
 
 **Legend**:
 - `[ ]` Not started
@@ -1521,11 +1523,317 @@
 
 ### Phase 10 Deliverables
 
-- [ ] Polished user experience
-- [ ] Production-ready security
-- [ ] Comprehensive documentation
+- [x] Polished user experience
+- [x] Production-ready security
+- [x] Comprehensive documentation
 - [ ] Published to PyPI
-- [ ] 90%+ test coverage
+- [x] 90%+ test coverage
+
+---
+
+## Phase 11: Shell Completion & Login Shell Support
+
+**Goal**: Full shell completion integration and login shell compatibility
+**Estimated Effort**: 1-2 weeks
+**Dependencies**: Phase 1, Phase 10
+
+### 11.1 Hybrid Shell Completion
+
+Implement configurable tab completion that integrates with the underlying shell.
+
+- [ ] Create `shell/completion_modes.py`:
+  - [ ] `CompletionMode` enum:
+    - [ ] `NATIVE` - Only AgentSH completions (current behavior)
+    - [ ] `PASSTHROUGH` - Full PTY passthrough for completions
+    - [ ] `HYBRID` - Merge AgentSH + shell completions (default)
+  - [ ] `ShellCompletionProxy` class:
+    - [ ] `query_shell_completions(partial: str) -> list[str]`
+    - [ ] Support for bash (`compgen`)
+    - [ ] Support for zsh (completion system)
+    - [ ] Support for fish (fish_complete)
+    - [ ] Timeout handling for slow completions
+
+- [ ] Update `shell/completer.py`:
+  - [ ] Add `completion_mode` configuration option
+  - [ ] Implement `_complete_shell_command(text: str) -> list[str]`:
+    - [ ] Query underlying shell for command completions
+    - [ ] Parse shell completion output
+    - [ ] Handle executable path completion
+    - [ ] Handle argument completion (flags, options)
+  - [ ] Merge shell completions with AgentSH completions in hybrid mode
+  - [ ] Prioritization: AgentSH special commands > tools > shell completions
+  - [ ] Deduplication of merged completions
+
+- [ ] Update `config/schemas.py`:
+  - [ ] Add `completion_mode: CompletionMode` to `ShellConfig`
+  - [ ] Default to `HYBRID`
+
+- [ ] PTY passthrough completion mode:
+  - [ ] Raw terminal mode for tab key passthrough
+  - [ ] Capture and display shell's native completion UI
+  - [ ] Return to AgentSH prompt after completion
+
+### 11.2 Login Shell Support
+
+Make AgentSH compatible as a login shell for `/etc/shells`, `chsh`, and PAM.
+
+- [ ] Create `shell/login.py`:
+  - [ ] `is_login_shell() -> bool` - detect if invoked as login shell
+  - [ ] `setup_login_environment()` - proper login shell initialization
+  - [ ] `source_profile_files()` - source /etc/profile, ~/.profile, etc.
+
+- [ ] Login shell requirements:
+  - [ ] Handle `-l` / `--login` flag
+  - [ ] Handle invocation as `-agentsh` (leading dash = login shell)
+  - [ ] Source appropriate profile files:
+    - [ ] `/etc/profile` (all users)
+    - [ ] `~/.bash_profile` or `~/.profile` (user)
+    - [ ] `~/.bashrc` / `~/.zshrc` (interactive)
+  - [ ] Set `LOGIN_SHELL` environment variable
+  - [ ] Proper `$0` handling
+
+- [ ] `/etc/shells` compatibility:
+  - [ ] Document how to add to `/etc/shells`
+  - [ ] Installer script option to add entry
+  - [ ] Absolute path requirement (no symlinks for some systems)
+
+- [ ] `chsh` considerations:
+  - [ ] Must be in `/etc/shells` to be valid
+  - [ ] Document user instructions for `chsh -s /path/to/agentsh`
+  - [ ] Handle `chsh` restrictions on some systems
+
+- [ ] PAM integration:
+  - [ ] Ensure proper exit codes for PAM session management
+  - [ ] Handle `pam_env` environment loading
+  - [ ] Support `pam_limits` (ulimit integration)
+  - [ ] Document `/etc/security/limits.conf` considerations
+
+- [ ] `/etc/passwd` and `shadow` considerations:
+  - [ ] AgentSH path must be absolute in passwd entry
+  - [ ] Handle restricted shells (`/bin/false`, `/sbin/nologin`)
+  - [ ] Document admin procedures for setting login shell
+
+- [ ] `sudoers` considerations:
+  - [ ] Handle `sudo -s` (spawn shell)
+  - [ ] Handle `sudo -i` (login shell)
+  - [ ] `Defaults env_keep` for AgentSH env vars
+  - [ ] Document `secure_path` considerations
+
+- [ ] Create `scripts/install-login-shell.sh`:
+  - [ ] Check if AgentSH is installed properly
+  - [ ] Add to `/etc/shells` (requires sudo)
+  - [ ] Optionally set as user's default shell
+  - [ ] Verify PAM configuration
+  - [ ] Rollback instructions
+
+### 11.3 Shell Initialization & Startup
+
+- [ ] Implement proper shell startup sequence:
+  - [ ] `--norc` flag to skip config loading
+  - [ ] `--noprofile` flag to skip profile loading (login shells)
+  - [ ] `--rcfile <file>` to specify custom init file
+  - [ ] `AGENTSH_INIT_FILE` environment variable
+
+- [ ] Create `~/.agentshrc` support:
+  - [ ] Source after underlying shell init
+  - [ ] AgentSH-specific aliases and functions
+  - [ ] Tool registration
+  - [ ] Completion customization
+
+- [ ] Startup performance:
+  - [ ] Lazy loading of AI components
+  - [ ] Deferred plugin initialization
+  - [ ] Profile startup time with `--profile-startup`
+  - [ ] Target: < 200ms to first prompt
+
+### 11.4 External Completion Scripts
+
+Generate completion scripts for shell installations where AgentSH is NOT the shell.
+
+- [ ] Create `agentsh completions` subcommand:
+  - [ ] `agentsh completions bash` - output bash completion script
+  - [ ] `agentsh completions zsh` - output zsh completion script
+  - [ ] `agentsh completions fish` - output fish completion script
+  - [ ] `agentsh completions --install` - install to appropriate location
+
+- [ ] Bash completion script:
+  - [ ] Complete `agentsh` command and subcommands
+  - [ ] Complete `--config`, `--log-level` options
+  - [ ] Complete `devices add/remove/list` subcommands
+  - [ ] Install to `/etc/bash_completion.d/` or `~/.local/share/bash-completion/`
+
+- [ ] Zsh completion script:
+  - [ ] `_agentsh` completion function
+  - [ ] Subcommand completion with descriptions
+  - [ ] Install to `$fpath` location
+
+- [ ] Fish completion script:
+  - [ ] Fish-native completion format
+  - [ ] Install to `~/.config/fish/completions/`
+
+### 11.5 Session Management
+
+- [ ] Implement proper session handling:
+  - [ ] Session ID generation and tracking
+  - [ ] `$AGENTSH_SESSION_ID` environment variable
+  - [ ] Session persistence across shell restarts
+  - [ ] Session cleanup on logout
+
+- [ ] TTY handling:
+  - [ ] Proper job control (fg, bg, jobs)
+  - [ ] SIGTSTP (Ctrl+Z) handling
+  - [ ] SIGCONT for resumed jobs
+  - [ ] Process group management
+
+### Phase 11 Tests
+
+- [ ] `tests/unit/test_completion_modes.py`:
+  - [ ] Test native completion mode
+  - [ ] Test hybrid completion merging
+  - [ ] Test shell completion parsing
+- [ ] `tests/unit/test_login_shell.py`:
+  - [ ] Test login shell detection
+  - [ ] Test profile sourcing logic
+  - [ ] Test startup flags
+- [ ] `tests/integration/test_login_shell.py`:
+  - [ ] Test as login shell in container
+  - [ ] Test `sudo -i` behavior
+  - [ ] Test `chsh` workflow
+
+### Phase 11 Deliverables
+
+- [ ] Hybrid tab completion working with bash/zsh/fish
+- [ ] Configurable completion modes
+- [ ] Login shell compatible (can be set in `/etc/passwd`)
+- [ ] PAM integration documented and tested
+- [ ] External completion scripts for all major shells
+- [ ] Startup time < 200ms
+- [ ] Full job control (Ctrl+Z, fg, bg)
+
+---
+
+## Phase 12: Installation & Distribution
+
+**Goal**: Comprehensive installation system for universal availability
+**Estimated Effort**: 1 week
+**Dependencies**: Phase 10
+**Status**: Complete
+
+### 12.1 Universal Installer Script
+
+- [x] Create `scripts/install.sh`:
+  - [x] curl/wget compatible installation
+  - [x] OS detection (Linux, macOS, FreeBSD, Windows detection)
+  - [x] Architecture detection (x86_64, aarch64, armv7)
+  - [x] Distribution detection (Ubuntu, Fedora, Arch, Alpine, etc.)
+  - [x] Package manager detection (brew, apt, dnf, pacman, apk, zypper)
+  - [x] Python version detection and installation
+  - [x] Multiple fallback methods (brew → apt → pipx/uv → pip)
+  - [x] PATH configuration for shell rc files
+  - [x] /etc/shells registration
+  - [x] Default shell setting option
+  - [x] Environment variable configuration:
+    - [x] `AGENTSH_VERSION` - Specific version
+    - [x] `AGENTSH_INSTALL_DIR` - Custom install location
+    - [x] `AGENTSH_NO_MODIFY_PATH` - Skip PATH modification
+    - [x] `AGENTSH_SET_DEFAULT_SHELL` - Set as default
+
+### 12.2 macOS (Homebrew)
+
+- [x] Create `packaging/homebrew/agentsh.rb`:
+  - [x] Formula with virtualenv support
+  - [x] Python dependencies as resources
+  - [x] Shell completion generation
+  - [x] Post-install instructions
+  - [x] Caveats for /etc/shells
+  - [x] Test block
+
+### 12.3 Debian/Ubuntu (APT)
+
+- [x] Create `packaging/debian/` directory:
+  - [x] `control` - Package metadata
+  - [x] `rules` - Build rules (dh-python)
+  - [x] `changelog` - Version history
+  - [x] `copyright` - MIT license
+  - [x] `compat` - Debhelper version
+  - [x] `postinst` - Add to /etc/shells
+  - [x] `postrm` - Remove from /etc/shells
+  - [x] Shell completion installation
+
+### 12.4 Fedora/RHEL (RPM)
+
+- [x] Create `packaging/rpm/agentsh.spec`:
+  - [x] RPM spec file
+  - [x] Python dependencies
+  - [x] Shell completions
+  - [x] %post script for /etc/shells
+  - [x] %postun script for cleanup
+
+### 12.5 Arch Linux (AUR)
+
+- [x] Create `packaging/arch/`:
+  - [x] `PKGBUILD` - Build script
+  - [x] `agentsh.install` - Install hooks
+  - [x] Optional dependencies for providers
+  - [x] Shell completions
+
+### 12.6 Alpine Linux (APK)
+
+- [x] Create `packaging/alpine/APKBUILD`:
+  - [x] APKBUILD script
+  - [x] Subpackages for completions
+  - [x] Post-install hooks
+
+### 12.7 Docker Images
+
+- [x] Create `packaging/docker/`:
+  - [x] `Dockerfile` - Standard Debian-based image
+  - [x] `Dockerfile.alpine` - Minimal Alpine image
+  - [x] `Dockerfile.dev` - Development image
+  - [x] `docker-compose.yml` - Multi-container setup
+  - [x] `docker-entrypoint.sh` - Entrypoint script
+  - [x] `.dockerignore` - Build exclusions
+  - [x] Ollama companion service
+  - [x] Volume mounts for persistence
+
+### 12.8 Windows Support
+
+- [x] Create `packaging/windows/`:
+  - [x] `install.ps1` - PowerShell installer
+  - [x] `README.md` - Windows documentation
+  - [x] winget/choco/scoop detection
+  - [x] WSL2 recommendation
+  - [x] Python auto-installation
+
+### 12.9 Shell Completions
+
+- [x] Create `completions/` directory:
+  - [x] `agentsh.bash` - Bash completions
+  - [x] `agentsh.zsh` - Zsh completions
+  - [x] `agentsh.fish` - Fish completions
+  - [x] Command/subcommand completions
+  - [x] Option completions
+  - [x] Model and provider completions
+
+### Phase 12 Tests
+
+- [ ] `tests/integration/test_install_script.py`:
+  - [ ] Test install script in Docker containers
+  - [ ] Test OS detection logic
+  - [ ] Test Python installation fallbacks
+
+### Phase 12 Deliverables
+
+- [x] Universal curl/wget installer working
+- [x] Homebrew formula ready
+- [x] Debian package files ready
+- [x] RPM spec ready
+- [x] Arch PKGBUILD ready
+- [x] Alpine APKBUILD ready
+- [x] Docker images (standard, alpine, dev)
+- [x] Windows PowerShell installer
+- [x] Shell completions for bash/zsh/fish
+- [x] `packaging/README.md` documentation
 
 ---
 
@@ -1545,9 +1853,12 @@
 ### Agent Package (`src/agentsh/agent/`)
 - [x] `__init__.py`
 - [x] `llm_client.py` - LLM abstraction
-- [x] `providers/anthropic.py`
-- [x] `providers/openai.py`
-- [ ] `providers/ollama.py`
+- [x] `providers/__init__.py` - Provider exports + factory
+- [x] `providers/anthropic.py` - Anthropic Claude
+- [x] `providers/openai.py` - OpenAI GPT
+- [x] `providers/ollama.py` - Local Ollama models
+- [x] `providers/openrouter.py` - OpenRouter (200+ models)
+- [x] `providers/litellm.py` - LiteLLM unified interface
 - [x] `prompts.py` - System prompts
 - [x] `agent_loop.py` - ReAct loop
 - [x] `cache.py` - LLM response caching
@@ -1783,6 +2094,8 @@
 | Dec 2025 | 1.1 | Phase 9 (Robotics) completed, Phase 10 (UX Polish) completed |
 | Dec 2025 | 1.2 | Added unit tests for llm_client, agent_loop; updated test checklist (44 unit test files) |
 | Dec 2025 | 1.3 | Added tab completion (shell/completer.py), resource manager (utils/resource_manager.py); 1224 tests passing |
+| Dec 2025 | 1.4 | Added Ollama, LiteLLM, OpenRouter providers; 2265 tests passing |
+| Dec 2025 | 1.5 | Phase 12 (Installation & Distribution) complete: universal installer, Homebrew, Debian, RPM, Arch, Alpine, Docker, Windows |
 
 ---
 

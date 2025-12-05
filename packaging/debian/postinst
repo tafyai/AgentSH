@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+        # Add agentsh to /etc/shells if not present
+        AGENTSH_PATH="/usr/bin/agentsh"
+        if [ -x "$AGENTSH_PATH" ]; then
+            if ! grep -q "^${AGENTSH_PATH}$" /etc/shells 2>/dev/null; then
+                echo "$AGENTSH_PATH" >> /etc/shells
+            fi
+        fi
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

@@ -1,0 +1,40 @@
+Source: agentsh
+Section: shells
+Priority: optional
+Maintainer: AgentSH Team <team@agentsh.dev>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all (>= 3.10),
+               python3-setuptools,
+               python3-pip,
+               python3-venv
+Standards-Version: 4.6.2
+Homepage: https://github.com/agentsh/agentsh
+Vcs-Browser: https://github.com/agentsh/agentsh
+Vcs-Git: https://github.com/agentsh/agentsh.git
+Rules-Requires-Root: no
+
+Package: agentsh
+Architecture: all
+Depends: ${python3:Depends},
+         ${misc:Depends},
+         python3 (>= 3.10),
+         python3-httpx,
+         python3-click,
+         python3-rich,
+         python3-yaml,
+         python3-pydantic
+Recommends: python3-anthropic
+Suggests: ollama
+Description: AI-enhanced terminal shell
+ AgentSH is an AI-enhanced terminal shell that understands natural language
+ commands and translates them into shell commands. It provides:
+ .
+  - Natural language to command translation
+  - Multi-provider LLM support (Anthropic, OpenAI, Ollama, OpenRouter)
+  - Context-aware command generation
+  - Safe command execution with confirmation
+  - Full PTY support for interactive programs
+  - Bash/Zsh/Fish compatible
+ .
+ This package provides the agentsh command and can be set as a login shell.
