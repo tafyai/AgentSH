@@ -1,0 +1,78 @@
+# This workflow should be placed in the homebrew-tap repository
+# Path: agentsh/homebrew-tap/.github/workflows/update-formula.yml
+#
+# The tap repository structure should be:
+# homebrew-tap/
+# ├── .github/workflows/update-formula.yml  (this file)
+# ├── Formula/agentsh.rb
+# └── README.md
+
+name: Update Formula
+
+on:
+  repository_dispatch:
+    types: [update-formula]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update formula
+        run: |
+          VERSION="${{ github.event.client_payload.version }}"
+          SHA256="${{ github.event.client_payload.sha256 }}"
+          URL="${{ github.event.client_payload.url }}"
+
+          # Update the formula file
+          cat > Formula/agentsh.rb << 'FORMULA_EOF'
+          # frozen_string_literal: true
+
+          class Agentsh < Formula
+            include Language::Python::Virtualenv
+
+            desc "AI-enhanced terminal shell with natural language command generation"
+            homepage "https://github.com/agentsh/agentsh"
+            url "${URL}"
+            sha256 "${SHA256}"
+            license "MIT"
+            head "https://github.com/agentsh/agentsh.git", branch: "main"
+
+            depends_on "python@3.11"
+
+            def install
+              virtualenv_install_with_resources
+            end
+
+            def caveats
+              <<~EOS
+                AgentSH has been installed!
+
+                To start: agentsh
+                To configure: agentsh config init
+
+                To set as default shell:
+                  echo '#{HOMEBREW_PREFIX}/bin/agentsh' | sudo tee -a /etc/shells
+                  chsh -s #{HOMEBREW_PREFIX}/bin/agentsh
+              EOS
+            end
+
+            test do
+              assert_match "agentsh", shell_output("#{bin}/agentsh --version")
+            end
+          end
+          FORMULA_EOF
+
+          # Replace placeholders
+          sed -i "s|\${URL}|${URL}|g" Formula/agentsh.rb
+          sed -i "s|\${SHA256}|${SHA256}|g" Formula/agentsh.rb
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/agentsh.rb
+          git commit -m "Update agentsh to ${{ github.event.client_payload.version }}"
+          git push
